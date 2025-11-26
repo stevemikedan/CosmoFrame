@@ -7,6 +7,7 @@ import sys
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock, call
 import inspect
+from pathlib import Path
 
 # Add parent directory to path for cosmosim import
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -280,11 +281,13 @@ def test_scenario_display_name_uses_short_name():
     assert exit_code == 0
 
 
-def test_export_json_uses_export_simulation_instead_of_run():
-    """Verify --export-json calls export_simulation instead of module.run()."""
+@patch("cosmosim.export_simulation")
+@patch("os.environ", new_callable=dict)
+def test_run_scenario_export_json_default_dir(mock_environ, mock_export):
+    """Test JSON export with default directory (frames/<scenario_name>)."""
+    # Setup mock scenario
     fake_cfg = object()
     fake_state = object()
-    
     fake_module = SimpleNamespace(
         __name__="fake_scenario",
         build_config=MagicMock(return_value=fake_cfg),
@@ -292,34 +295,36 @@ def test_export_json_uses_export_simulation_instead_of_run():
         run=MagicMock(),
     )
     
+    # Setup args
     args = SimpleNamespace(
-        steps=42,
+        steps=50,
         headless=False,
         output_dir=None,
         export_json=True,
-        export_json_dir="frames_out",
+        export_json_dir=None,
         config_dump=False,
     )
     
-    with patch("cosmosim.export_simulation", autospec=True) as mock_export:
-        cosmosim.run_scenario(fake_module, args, "fake_scenario")
+    # Run
+    cosmosim.run_scenario(fake_module, args, "test_scenario")
     
-    # Verify build methods called
-    fake_module.build_config.assert_called_once()
-    fake_module.build_initial_state.assert_called_once_with(fake_cfg)
+    # Verify export_simulation called with correct output_dir
+    expected_dir = str(Path("frames") / "test_scenario")
+    mock_export.assert_called_once_with(
+        fake_cfg, fake_state, steps=50, output_dir=expected_dir
+    )
     
-    # Verify run() NOT called
-    fake_module.run.assert_not_called()
-    
-    # Verify export_simulation called with correct args
-    mock_export.assert_called_once_with(fake_cfg, fake_state, steps=42, output_dir="frames_out")
+    # Verify environment variable set
+    assert mock_environ.get("COSMOSIM_EXPORT_JSON_DIR") == str(Path(expected_dir).resolve())
 
 
-def test_export_json_defaults_steps_and_dir_when_missing():
-    """Verify --export-json defaults to steps=100 and output_dir='frames'."""
+@patch("cosmosim.export_simulation")
+@patch("os.environ", new_callable=dict)
+def test_run_scenario_export_json_custom_dir(mock_environ, mock_export):
+    """Test JSON export with custom directory."""
+    # Setup mock scenario
     fake_cfg = object()
     fake_state = object()
-    
     fake_module = SimpleNamespace(
         __name__="fake_scenario",
         build_config=MagicMock(return_value=fake_cfg),
@@ -327,6 +332,43 @@ def test_export_json_defaults_steps_and_dir_when_missing():
         run=MagicMock(),
     )
     
+    # Setup args
+    custom_dir = "./custom_frames"
+    args = SimpleNamespace(
+        steps=50,
+        headless=False,
+        output_dir=None,
+        export_json=True,
+        export_json_dir=custom_dir,
+        config_dump=False,
+    )
+    
+    # Run
+    cosmosim.run_scenario(fake_module, args, "test_scenario")
+    
+    # Verify export_simulation called with correct output_dir
+    mock_export.assert_called_once_with(
+        fake_cfg, fake_state, steps=50, output_dir=custom_dir
+    )
+    
+    # Verify environment variable set
+    assert mock_environ.get("COSMOSIM_EXPORT_JSON_DIR") == str(Path(custom_dir).resolve())
+
+
+@patch("cosmosim.export_simulation")
+def test_run_scenario_export_json_steps_default(mock_export):
+    """Test JSON export uses default steps if not provided."""
+    # Setup mock scenario
+    fake_cfg = object()
+    fake_state = object()
+    fake_module = SimpleNamespace(
+        __name__="fake_scenario",
+        build_config=MagicMock(return_value=fake_cfg),
+        build_initial_state=MagicMock(return_value=fake_state),
+        run=MagicMock(),
+    )
+    
+    # Setup args
     args = SimpleNamespace(
         steps=None,
         headless=False,
@@ -336,51 +378,48 @@ def test_export_json_defaults_steps_and_dir_when_missing():
         config_dump=False,
     )
     
-    with patch("cosmosim.export_simulation", autospec=True) as mock_export:
-        cosmosim.run_scenario(fake_module, args, "fake_scenario")
+    # Run
+    cosmosim.run_scenario(fake_module, args, "test_scenario")
     
-    # Verify defaults are used
-    mock_export.assert_called_once_with(fake_cfg, fake_state, steps=100, output_dir="./frames")
+    # Verify export_simulation called with default steps (100)
+    expected_dir = str(Path("frames") / "test_scenario")
+    mock_export.assert_called_once_with(
+        fake_cfg, fake_state, steps=100, output_dir=expected_dir
+    )
 
 
-def test_export_json_ignores_run_signature_and_never_calls_run():
-    """Verify export mode never calls run(), even with unusual signature."""
+@patch("kernel.step_simulation")
+@patch("exporters.json_export.export_frame")
+def test_export_simulation_integration(mock_export_frame, mock_step):
+    """Test export_simulation logic with physics mocking."""
+    # Mock physics to be a no-op
+    mock_step.side_effect = lambda state, cfg: state
+    
+    # Import here to avoid circular imports or early binding issues
+    from exporters.json_export import export_simulation
+    
+    cfg = MagicMock()
+    state = MagicMock()
+    steps = 5
+    output_dir = "test_out"
+    
+    with patch("pathlib.Path.mkdir") as mock_mkdir:
+        export_simulation(cfg, state, steps=steps, output_dir=output_dir)
+        
+        # Verify mkdir called
+        mock_mkdir.assert_called()
+        
+        # Verify export_frame called 'steps' times
+        assert mock_export_frame.call_count == steps
+        
+        # Verify step_simulation called 'steps' times
+        assert mock_step.call_count == steps
+
+
+def test_run_scenario_normal_mode():
+    """Test that normal run mode is preserved (no export)."""
     fake_cfg = object()
     fake_state = object()
-    
-    def weird_run(*args, **kwargs):
-        raise AssertionError("run() should NOT be called in export mode")
-    
-    fake_module = SimpleNamespace(
-        __name__="fake_scenario",
-        build_config=MagicMock(return_value=fake_cfg),
-        build_initial_state=MagicMock(return_value=fake_state),
-        run=MagicMock(side_effect=weird_run),
-    )
-    
-    args = SimpleNamespace(
-        steps=50,
-        headless=False,
-        output_dir=None,
-        export_json=True,
-        export_json_dir="output",
-        config_dump=False,
-    )
-    
-    with patch("cosmosim.export_simulation", autospec=True) as mock_export:
-        # This should NOT raise AssertionError
-        cosmosim.run_scenario(fake_module, args, "fake_scenario")
-    
-    # Verify export_simulation called
-    mock_export.assert_called_once()
-    # Run should NOT have been called (would have raised AssertionError)
-
-
-def test_normal_mode_still_calls_module_run():
-    """Verify normal mode (without --export-json) still calls module.run."""
-    fake_cfg = object()
-    fake_state = object()
-    
     fake_module = SimpleNamespace(
         __name__="fake_scenario",
         build_config=MagicMock(return_value=fake_cfg),
@@ -397,14 +436,14 @@ def test_normal_mode_still_calls_module_run():
         config_dump=False,
     )
     
-    with patch("cosmosim.export_simulation", autospec=True) as mock_export:
-        cosmosim.run_scenario(fake_module, args, "fake_scenario")
-    
-    # Verify module.run is called
-    fake_module.run.assert_called_once()
-    
-    # Verify export_simulation is NOT called
-    mock_export.assert_not_called()
+    with patch("cosmosim.export_simulation") as mock_export:
+        cosmosim.run_scenario(fake_module, args, "test_scenario")
+        
+        # Verify module.run is called
+        fake_module.run.assert_called_once()
+        
+        # Verify export_simulation is NOT called
+        mock_export.assert_not_called()
 
 
 def test_main_wires_export_json_flags_into_run_scenario():

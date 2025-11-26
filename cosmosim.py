@@ -12,10 +12,11 @@ import inspect
 import os
 import sys
 import pathlib
+# from pathlib import Path
 from typing import Any
 
 # JSON exporter import
-from json_exporter import export_simulation
+from exporters.json_export import export_simulation, export_frame
 
 __version__ = "0.1"
 
@@ -120,14 +121,41 @@ def run_scenario(module: Any, args: argparse.Namespace, scenario_name: str) -> N
     # -----------------------------------------------------------------
     # JSON Export Mode
     # -----------------------------------------------------------------
+    # -----------------------------------------------------------------
+    # JSON Export Mode
+    # -----------------------------------------------------------------
     if getattr(args, "export_json", False):
         # Determine export directory
-        export_dir = getattr(args, "export_json_dir", None) or "./frames"
+        if getattr(args, "export_json_dir", None):
+            # 1. Preserve raw user string EXACTLY for export_simulation()
+            raw_export_dir = args.export_json_dir   # e.g. "./custom_frames"
+            # 2. Convert to Path ONLY for mkdir
+            export_dir = pathlib.Path(raw_export_dir)
+        else:
+            # Default to frames/<scenario_name>
+            export_dir = pathlib.Path("frames") / scenario_name
+            raw_export_dir = str(export_dir)
+            
+        # Ensure directory exists
+        export_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Set environment variable for consistency
+        os.environ["COSMOSIM_EXPORT_JSON_DIR"] = str(export_dir.resolve())
+        
         # Determine number of steps (default 100 if not provided)
         steps_value = args.steps if args.steps is not None else 100
 
+# # POSIX-normalized path so tests pass consistently
+#         export_dir_str = export_dir.as_posix()
+
         # Run the exporter
-        final_state = export_simulation(cfg, state, steps=steps_value, output_dir=export_dir)
+        # CRITICAL: Always pass the resolved export_dir explicitly
+        final_state = export_simulation(
+            cfg,
+            state,
+            steps=steps_value,
+            output_dir=raw_export_dir
+        )
 
         # Success summary
         print(f"\nExported {steps_value} JSON frames to: {export_dir}")
@@ -157,8 +185,8 @@ def run_scenario(module: Any, args: argparse.Namespace, scenario_name: str) -> N
     if args.output_dir:
         output_path = pathlib.Path(args.output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
-        os.environ["COSMOSIM_OUTPUT_DIR"] = str(output_path.absolute())
-        print(f"Output directory: {output_path.absolute()}")
+        os.environ["COSMOSIM_OUTPUT_DIR"] = str(output_path.resolve())
+        print(f"Output directory: {output_path.resolve()}")
 
     # Step 7: Execute scenario
     print(f"Running scenario '{scenario_name}'...\n")

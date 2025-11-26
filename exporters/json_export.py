@@ -16,7 +16,7 @@ import jax.numpy as jnp
 
 # Import the core simulation step – this is the same function used by the
 # scenario modules, ensuring no duplication of physics.
-from kernel import step_simulation
+import kernel
 
 # ---------------------------------------------------------------------------
 # Helper utilities
@@ -148,10 +148,7 @@ def export_frame(state: Any, frame_index: int, output_dir: str | Path) -> None:
     # Overwrite the placeholder ``frame`` value with the actual index.
     frame_dict["frame"] = frame_index
 
-    file_name = out_path / f"frame_{frame_index:05}.json"
-    with file_name.open("w", encoding="utf-8") as fp:
-        json.dump(frame_dict, fp, separators=(',', ':'), ensure_ascii=False)
-
+    
 
 def export_simulation(cfg: Any, state: Any, *, steps: int, output_dir: str | Path) -> Any:
     """Run a simulation for ``steps`` frames, exporting each to JSON.
@@ -173,5 +170,5 @@ def export_simulation(cfg: Any, state: Any, *, steps: int, output_dir: str | Pat
 
     for i in range(steps):
         export_frame(state, i, out_path)
-        state = step_simulation(state, cfg)
+        state = kernel.step_simulation(state, cfg)
     return state

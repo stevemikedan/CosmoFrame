@@ -140,6 +140,23 @@
         <label style="color: #fff; margin: 0 5px;">FPS:</label>
         <input type="number" id="fps-input" min="1" max="60" value="30"
             style="width: 50px; padding: 5px; border-radius: 4px; border: none;">
+        <span style="color: #888; margin: 0 5px;">|</span>
+        <label style="color: #fff; margin: 0 5px;">Mode:</label>
+        <select id="visual-mode" style="padding: 5px; border-radius: 4px; border: none;">
+            <option value="mass-color">Mass Color</option>
+            <option value="type-color">Type Color</option>
+            <option value="velocity-color">Velocity Color</option>
+            <option value="active-mask">Active Mask</option>
+            <option value="uniform">Uniform</option>
+        </select>
+        <span style="color: #888; margin: 0 5px;">|</span>
+        <div id="topologyControls" style="display: inline-flex; align-items: center; gap: 5px; color: white;">
+            <label style="cursor: pointer;">
+                <input type="checkbox" id="toggleTopology" checked>
+                Overlay
+            </label>
+            <span id="topologyLabel" style="font-size: 12px; color: #aaa; margin-left: 5px;">(none)</span>
+        </div>
     </div>
 
     <!-- Loading Overlay -->
@@ -166,6 +183,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { loadFramesByFetch, promptForDirectory } from './frameLoader.js';
         import { FramePlayer } from './player.js';
+        import { setVisualMode } from './visualModes.js';
 
         // Scene setup
         const canvas = document.getElementById('cosmosim-canvas');
@@ -213,10 +231,15 @@
         const btnPrev = document.getElementById('btn-prev');
         const btnNext = document.getElementById('btn-next');
         const fpsInput = document.getElementById('fps-input');
+        const visualModeSelect = document.getElementById('visual-mode');
         const hudFrame = document.getElementById('hud-frame');
         const hudTotal = document.getElementById('hud-total');
         const hudTime = document.getElementById('hud-time');
         const hudEntities = document.getElementById('hud-entities');
+
+        // Topology UI
+        const toggleTopology = document.getElementById('toggleTopology');
+        const topologyLabel = document.getElementById('topologyLabel');
 
         // Frame load progress listener
         window.addEventListener('frameLoadProgress', (e) => {
@@ -270,6 +293,20 @@
         function initializePlayer(frames) {
             player = new FramePlayer(frames, scene);
             player.initializeEntities();
+
+            // Wire up topology UI
+            player.topologyOverlay.onModeChange = (mode) => {
+                topologyLabel.textContent = `(${mode})`;
+            };
+
+            // Initial state
+            const initialTopo = frames[0]?.topology;
+            if (initialTopo) {
+                player.topologyOverlay.update(initialTopo);
+            } else {
+                topologyLabel.textContent = '(none)';
+            }
+
             player.updateFrame();
 
             loadingOverlay.classList.add('hidden');
@@ -307,9 +344,38 @@
             player.setFPS(parseInt(fpsInput.value) || 30);
         });
 
+        visualModeSelect.addEventListener('change', (e) => {
+            setVisualMode(e.target.value);
+            if (player) player.refreshVisuals();
+            // Remove focus so keyboard shortcuts still work
+            visualModeSelect.blur();
+        });
+
+        toggleTopology.addEventListener('change', (e) => {
+            if (player) {
+                player.topologyOverlay.setVisible(e.target.checked);
+            }
+        });
+
         // Keyboard shortcuts
         window.addEventListener('keydown', (e) => {
             if (!player) return;
+
+            // Visual Mode shortcuts (1-5)
+            if (['1', '2', '3', '4', '5'].includes(e.key)) {
+                const modes = {
+                    '1': 'mass-color',
+                    '2': 'type-color',
+                    '3': 'velocity-color',
+                    '4': 'active-mask',
+                    '5': 'uniform'
+                };
+                const mode = modes[e.key];
+                setVisualMode(mode);
+                visualModeSelect.value = mode;
+                player.refreshVisuals();
+                return;
+            }
 
             switch (e.code) {
                 case 'Space':
