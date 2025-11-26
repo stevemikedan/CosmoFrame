@@ -12,7 +12,7 @@ from chex import dataclass
 @dataclass
 class UniverseConfig:
     """Static configuration parameters for a universe simulation."""
-    topology_type: int  # 0 = FLAT, 1 = SPHERE, 2 = TORUS
+    # Required fields (no defaults)
     physics_mode: int   # 0 = VECTOR, 1 = LATTICE
     radius: float
     max_entities: int
@@ -20,7 +20,10 @@ class UniverseConfig:
     dt: float           # timestep
     c: float            # speed of light-like constant
     G: float            # gravitational constant-like parameter
+    # Optional fields with defaults – placed after required fields
     dim: int = 2        # Spatial dimensionality (2, 3, etc.)
+    topology_type: int = 0  # 0 = FLAT, 1 = TORUS (future types reserved)
+    bounds: float | None = None  # None means infinite flat space
 
 @dataclass
 class UniverseState:
@@ -42,6 +45,10 @@ class UniverseState:
     node_pos: jnp.ndarray       # shape (max_nodes, 2)
     edge_active: jnp.ndarray    # shape (max_nodes, max_nodes)
     edge_indices: jnp.ndarray   # shape (max_nodes, max_nodes, 2)
+
+    # Optional topology fields – placed at the end to keep .replace() compatibility
+    topology_type: int = 0
+    bounds: float = 0.0
 
 def initialize_state(config: UniverseConfig) -> UniverseState:
     """Initialize a UniverseState from configuration parameters.
@@ -70,4 +77,8 @@ def initialize_state(config: UniverseConfig) -> UniverseState:
         node_pos=jnp.zeros((config.max_nodes, 2)),
         edge_active=jnp.zeros((config.max_nodes, config.max_nodes), dtype=bool),
         edge_indices=jnp.zeros((config.max_nodes, config.max_nodes, 2), dtype=jnp.int32),
+
+        # Topology fields
+        topology_type=config.topology_type,
+        bounds=0.0 if config.bounds is None else config.bounds,
     )

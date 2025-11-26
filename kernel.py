@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 from state import UniverseConfig, UniverseState
 from entities import spawn_entity, despawn_entity
-from topology import enforce_boundaries
+from topology import enforce_boundaries, apply_topology
 
 
 def update_vector_physics(state: UniverseState, config: UniverseConfig) -> UniverseState:
@@ -38,8 +38,6 @@ def update_vector_physics(state: UniverseState, config: UniverseConfig) -> Unive
     # acc[i] = sum_j (F_ij * disp_ij / dist_ij) / m_i
     # We need to be careful with broadcasting.
     # disp / dist[:, :, None] gives unit vectors (N, N, dim)
-    # force_mag[:, :, None] scales them (N, N, 1)
-    # Result is force vectors (N, N, dim)
     force_vec = disp * (force_mag / dist)[:, :, None]
     
     # Sum forces on each entity i (sum over j)
@@ -60,12 +58,13 @@ def update_vector_physics(state: UniverseState, config: UniverseConfig) -> Unive
     
     # 6. Apply active mask
     # Only update active entities. Inactive ones stay put.
-    # Force calculation naturally handles inactive if their mass is 0,
-    # but we explicitly mask to be safe and ensure they don't move.
     active_mask = state.entity_active[:, None]
     
     final_vel = jnp.where(active_mask, new_vel, state.entity_vel)
     final_pos = jnp.where(active_mask, new_pos, state.entity_pos)
+    
+    # 7. Apply topology to positions (and velocities if needed)
+    final_pos, final_vel = apply_topology(final_pos, final_vel, config)
     
     return state.replace(entity_pos=final_pos, entity_vel=final_vel)
 
@@ -106,7 +105,7 @@ def step_simulation(state: UniverseState, config: UniverseConfig) -> UniverseSta
     # 2. Apply physics update
     state = dispatch_physics(state, config)
 
-    # 3. Enforce topology boundaries
+    # 3. Enforce topology boundaries (for legacy behavior)
     new_entity_pos = enforce_boundaries(
         state.entity_pos,
         config.topology_type,
