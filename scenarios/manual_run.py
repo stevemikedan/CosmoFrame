@@ -22,9 +22,9 @@ def build_config() -> UniverseConfig:
 def build_initial_state(config: UniverseConfig):
     state = initialize_state(config)
     # simple 3-body line
-    state = spawn_entity(state, jnp.array([-2.0, 0.0]), jnp.array([0.0, 0.0]), 2.0, 1)
-    state = spawn_entity(state, jnp.array([ 0.0, 0.0]), jnp.array([0.0, 0.0]), 1.0, 1)
-    state = spawn_entity(state, jnp.array([ 2.0, 0.0]), jnp.array([0.0, 0.0]), 2.0, 1)
+    state = spawn_entity(state, jnp.array([-2.0, 0.0] + [0.0] * (config.dim - 2)), jnp.zeros(config.dim), 2.0, 1)
+    state = spawn_entity(state, jnp.array([ 0.0, 0.0] + [0.0] * (config.dim - 2)), jnp.zeros(config.dim), 1.0, 1)
+    state = spawn_entity(state, jnp.array([ 2.0, 0.0] + [0.0] * (config.dim - 2)), jnp.zeros(config.dim), 2.0, 1)
     return state
 
 

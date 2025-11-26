@@ -17,14 +17,18 @@ def spawn_entity(state: UniverseState, position: jnp.ndarray, velocity: jnp.ndar
     
     Args:
         state: Current universe state
-        position: Position vector (2,)
-        velocity: Velocity vector (2,)
+        position: Position vector (dim,)
+        velocity: Velocity vector (dim,)
         mass: Mass scalar
         ent_type: Entity type integer
         
     Returns:
         Updated state with new entity, or original state if full.
     """
+    # Validate dimensionality
+    if position.shape[-1] != state.entity_pos.shape[-1] or velocity.shape[-1] != state.entity_vel.shape[-1]:
+        raise ValueError("spawn_entity: position/velocity dimensionality does not match UniverseConfig.dim")
+
     # Find the first inactive index
     # argmin on boolean array returns index of first False (0)
     # If all are True (1), it returns 0. So we must check if any are False.

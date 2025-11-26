@@ -38,8 +38,8 @@ def build_initial_state(config: UniverseConfig):
     key = jax.random.PRNGKey(42)
     k1, k2, k3 = jax.random.split(key, 3)
 
-    positions = jax.random.normal(k1, (n, 2)) * (radius * 0.5)
-    velocities = jax.random.normal(k2, (n, 2)) * velocity_scale
+    positions = jax.random.normal(k1, (n, config.dim)) * (radius * 0.5)
+    velocities = jax.random.normal(k2, (n, config.dim)) * velocity_scale
     masses = jax.random.uniform(k3, (n,)) * 1.5 + 0.3
 
     # Spawn all bodies
@@ -69,7 +69,7 @@ def run(config: UniverseConfig, state):
         active_mask = state.entity_active
         traj.append(state.entity_pos[active_mask])
 
-    traj = jnp.stack(traj)  # (steps, n, 2)
+    traj = jnp.stack(traj)  # (steps, n, dim)
 
     plt.figure(figsize=(8, 8))
     for i in range(n):

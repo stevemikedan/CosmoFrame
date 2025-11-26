@@ -24,8 +24,8 @@ def binary_star_system():
     m = 5.0
 
     # positions
-    state = spawn_entity(state, jnp.array([-5.0, 0.0]), jnp.array([0.0, -0.5]), m, 1)
-    state = spawn_entity(state, jnp.array([ 5.0, 0.0]), jnp.array([0.0,  0.5]), m, 1)
+    state = spawn_entity(state, jnp.array([-5.0, 0.0] + [0.0] * (cfg.dim - 2)), jnp.array([0.0, -0.5] + [0.0] * (cfg.dim - 2)), m, 1)
+    state = spawn_entity(state, jnp.array([ 5.0, 0.0] + [0.0] * (cfg.dim - 2)), jnp.array([0.0,  0.5] + [0.0] * (cfg.dim - 2)), m, 1)
 
     return cfg, state
 
@@ -46,13 +46,13 @@ def mini_solar_system():
     state = initialize_state(cfg)
 
     # sun
-    state = spawn_entity(state, jnp.array([0.0, 0.0]), jnp.array([0.0, 0.0]), 20.0, 1)
+    state = spawn_entity(state, jnp.zeros(cfg.dim), jnp.zeros(cfg.dim), 20.0, 1)
 
     # planets
     planets = [
-        (jnp.array([ 4.0, 0.0]), jnp.array([0.0,  1.0]), 1.0),
-        (jnp.array([ 8.0, 0.0]), jnp.array([0.0,  0.7]), 2.0),
-        (jnp.array([12.0, 0.0]), jnp.array([0.0,  0.5]), 1.5),
+        (jnp.array([ 4.0, 0.0] + [0.0] * (cfg.dim - 2)), jnp.array([0.0,  1.0] + [0.0] * (cfg.dim - 2)), 1.0),
+        (jnp.array([ 8.0, 0.0] + [0.0] * (cfg.dim - 2)), jnp.array([0.0,  0.7] + [0.0] * (cfg.dim - 2)), 2.0),
+        (jnp.array([12.0, 0.0] + [0.0] * (cfg.dim - 2)), jnp.array([0.0,  0.5] + [0.0] * (cfg.dim - 2)), 1.5),
     ]
 
     for pos, vel, mass in planets:

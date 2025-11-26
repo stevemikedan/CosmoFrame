@@ -20,6 +20,7 @@ class UniverseConfig:
     dt: float           # timestep
     c: float            # speed of light-like constant
     G: float            # gravitational constant-like parameter
+    dim: int = 2        # Spatial dimensionality (2, 3, etc.)
 
 @dataclass
 class UniverseState:
@@ -31,8 +32,8 @@ class UniverseState:
 
     # Entity arrays (always present)
     entity_active: jnp.ndarray  # shape (max_entities,) boolean mask
-    entity_pos: jnp.ndarray     # shape (max_entities, 2)
-    entity_vel: jnp.ndarray     # shape (max_entities, 2)
+    entity_pos: jnp.ndarray     # shape (max_entities, dim)
+    entity_vel: jnp.ndarray     # shape (max_entities, dim)
     entity_mass: jnp.ndarray    # shape (max_entities,)
     entity_type: jnp.ndarray    # shape (max_entities,)
 
@@ -59,8 +60,8 @@ def initialize_state(config: UniverseConfig) -> UniverseState:
 
         # Entity arrays
         entity_active=jnp.zeros(config.max_entities, dtype=bool),
-        entity_pos=jnp.zeros((config.max_entities, 2)),
-        entity_vel=jnp.zeros((config.max_entities, 2)),
+        entity_pos=jnp.zeros((config.max_entities, config.dim)),
+        entity_vel=jnp.zeros((config.max_entities, config.dim)),
         entity_mass=jnp.zeros(config.max_entities),
         entity_type=jnp.zeros(config.max_entities),
 

@@ -14,7 +14,7 @@ def update_vector_physics(state: UniverseState, config: UniverseConfig) -> Unive
         Updated universe state with positions moved by velocity * dt
     """
     # 1. Compute pairwise displacement: r_j - r_i
-    # Shape: (N, N, 2)
+    # Shape: (N, N, dim)
     # disp[i, j] is vector from i to j
     disp = state.entity_pos[None, :, :] - state.entity_pos[:, None, :]
     
@@ -28,7 +28,7 @@ def update_vector_physics(state: UniverseState, config: UniverseConfig) -> Unive
     active_mass = jnp.where(state.entity_active, state.entity_mass, 0.0)
     
     # 3. Compute gravitational force magnitudes
-    # F = G * m_i * m_j / r^2
+    # F = G * m1 * m2 / r^2
     # Use real mass for receiver (i) and active_mass for source (j)
     # This ensures inactive entities don't exert gravity.
     # Shape: (N, N)
@@ -37,18 +37,18 @@ def update_vector_physics(state: UniverseState, config: UniverseConfig) -> Unive
     # 4. Compute acceleration
     # acc[i] = sum_j (F_ij * disp_ij / dist_ij) / m_i
     # We need to be careful with broadcasting.
-    # disp / dist[:, :, None] gives unit vectors (N, N, 2)
+    # disp / dist[:, :, None] gives unit vectors (N, N, dim)
     # force_mag[:, :, None] scales them (N, N, 1)
-    # Result is force vectors (N, N, 2)
+    # Result is force vectors (N, N, dim)
     force_vec = disp * (force_mag / dist)[:, :, None]
     
     # Sum forces on each entity i (sum over j)
-    # Shape: (N, 2)
+    # Shape: (N, dim)
     total_force = jnp.sum(force_vec, axis=1)
     
     # Acceleration = Force / Mass
     # Handle zero mass to avoid division by zero (though mass should be > 0)
-    # Shape: (N, 2)
+    # Shape: (N, dim)
     acc = total_force / (state.entity_mass[:, None] + 1e-6)
     
     # 5. Semi-implicit Euler integration
