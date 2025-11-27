@@ -8,7 +8,40 @@ despawn entities within the fixed-size arrays of UniverseState.
 
 import jax
 import jax.numpy as jnp
-from state import UniverseState
+from state import UniverseState, UniverseConfig
+from typing import Tuple
+
+
+def allocate_entities(cfg: UniverseConfig) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """
+    Allocate zero-initialized entity arrays consistent with UniverseConfig.
+
+    Provides a consistent way to allocate entity arrays with the correct shapes
+    and dtypes based on the simulation configuration.
+
+    Args:
+        cfg: Universe configuration containing max_entities and dim
+
+    Returns:
+        Tuple of (pos, vel, mass, type_id, active) where:
+            - pos:     (max_entities, dim) - positions
+            - vel:     (max_entities, dim) - velocities
+            - mass:    (max_entities,) - masses
+            - type_id: (max_entities,) - entity type identifiers
+            - active:  (max_entities,) - boolean activation mask (as int)
+
+    Example:
+        >>> cfg = UniverseConfig(max_entities=10, dim=2, ...)
+        >>> pos, vel, mass, type_id, active = allocate_entities(cfg)
+        >>> # pos.shape == (10, 2), all zeros
+    """
+    pos = jnp.zeros((cfg.max_entities, cfg.dim))
+    vel = jnp.zeros((cfg.max_entities, cfg.dim))
+    mass = jnp.zeros((cfg.max_entities,))
+    type_id = jnp.zeros((cfg.max_entities,), dtype=int)
+    active = jnp.zeros((cfg.max_entities,), dtype=int)
+
+    return pos, vel, mass, type_id, active
 
 
 def spawn_entity(state: UniverseState, position: jnp.ndarray, velocity: jnp.ndarray, 
