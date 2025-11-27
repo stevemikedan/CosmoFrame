@@ -10,6 +10,9 @@ import time
 import numpy as np
 import jax.numpy as jnp
 import jax
+# STABILIZATION PATCH IMPORTS
+import os
+
 
 from state import UniverseConfig, UniverseState, initialize_state
 from environment.engine import EnvironmentEngine
@@ -124,15 +127,45 @@ def run_sim(config, steps=200, gravity=True, seed=42, save_every=1):
         # 3. Update Physics (Integration)
         pos, vel = update_step(pos, vel, force, mass, active, config.dt)
         
+        # --- STABILIZATION PATCH: clamp + sanitize -------------------------
+        pos_np = np.array(pos)
+        vel_np = np.array(vel)
+
+        # Patch 1. Clamp velocities
+        max_speed = 5.0
+        speed = np.linalg.norm(vel_np, axis=1)
+        too_fast = speed > max_speed
+        if np.any(too_fast):
+            vel_np[too_fast] = (
+                vel_np[too_fast] / speed[too_fast][:, None] * max_speed
+            )
+
+        # Patch 2. Clamp radius (limit expansion blow-up)
+        max_radius = config.radius * 5.0
+        r = np.linalg.norm(pos_np, axis=1)
+        too_far = r > max_radius
+        if np.any(too_far):
+            pos_np[too_far] = (
+                pos_np[too_far] / r[too_far][:, None] * max_radius
+            )
+
+        # Patch 3. Replace NaN/Inf for JSON safety
+        pos_np = np.nan_to_num(pos_np, nan=0.0, posinf=1e6, neginf=-1e6)
+        vel_np = np.nan_to_num(vel_np, nan=0.0, posinf=1e6, neginf=-1e6)
+
+        # Patch 4. Recast back to JAX for next step
+        pos = jnp.array(pos_np)
+        vel = jnp.array(vel_np)
+        # -------------------------------------------------------------------
+
         # 4. Save Frame
         if step % save_every == 0:
             # Convert to list for JSON serialization
             frames.append({
                 "step": step,
-                "pos": np.array(pos).tolist(),
-                "vel": np.array(vel).tolist()
-            })
-            
+                "pos": pos_np.tolist(),
+                "vel": vel_np.tolist()
+            })         
     return frames
 
 
@@ -141,10 +174,7 @@ def main():
     
     # Simulation Config
     parser.add_argument("--steps", type=int, default=200, help="Number of steps")
-    
-    timestamp = int(time.time())
-    default_name = f"sim_output/sim_{timestamp}.json"
-    parser.add_argument("--outfile", type=str, default=default_name, help="Output JSON file")
+    parser.add_argument("--outfile", type=str, default=None, help="Output JSON file")
     
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--save-every", type=int, default=1, help="Save interval")
@@ -161,6 +191,42 @@ def main():
     parser.add_argument("--entities", type=int, default=50, help="Number of entities")
     
     args = parser.parse_args()
+
+    # ----------------------------------------------------------------------
+    # AUTO-NAMING LOGIC (Topology + Expansion + Substrate + Steps + Timestamp)
+    #
+    # Produces filenames like:
+    #   bubbleTop_scale_factorExp_vectorSub_300steps_20251127_163552.json
+    #
+    # This avoids overwrites, encodes full simulation identity,
+    # and works even if some CLI args are omitted (defaults fill in).
+    # ----------------------------------------------------------------------
+
+    def build_auto_filename(args):
+        # Normalize values (fall back to defaults if missing)
+        top = args.topology if args.topology else "flat"
+        exp = args.expansion if args.expansion else "none"
+        sub = args.substrate if args.substrate else "none"
+
+        # Steps matter scientifically and visually
+        steps = args.steps
+
+        # Timestamp (YYYYMMDD_HHMMSS)
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+
+        # Construct final name
+        filename = f"{top}Top_{exp}Exp_{sub}Sub_{steps}steps_{timestamp}.json"
+
+        return f"sim_output/{filename}"
+
+    # Ensure sim_output directory exists
+    os.makedirs("sim_output", exist_ok=True)
+
+    # Determine final outfile path
+    outfile = args.outfile if args.outfile else build_auto_filename(args)
+
+    print(f"[CosmoSim] Saving output to: {outfile}")
+    # ----------------------------------------------------------------------
     
     # Map topology string to int type
     topology_map = {
@@ -179,7 +245,7 @@ def main():
         max_nodes=1,
         dt=args.dt,
         c=1.0,
-        G=1.0,
+        G=0.1,
         dim=3,
         topology_type=topo_type,
         
@@ -210,10 +276,10 @@ def main():
     )
     
     # Save Output
-    with open(args.outfile, "w") as f:
+    with open(outfile, "w") as f:
         json.dump({"frames": frames}, f)
         
-    print(f"Saved {len(frames)} frames to {args.outfile}")
+    print(f"Saved {len(frames)} frames to {outfile}")
 
 
 if __name__ == "__main__":
