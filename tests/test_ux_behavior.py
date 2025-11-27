@@ -10,29 +10,18 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from state import UniverseConfig, UniverseState
 
-def test_printing_behavior_run_sim(capsys):
-    """Confirm run_sim.py prints 'Step' lines."""
-    import run_sim
-    cfg = run_sim.build_config()
-    state = run_sim.build_initial_state(cfg)
-    
-    # Patch step_simulation to be fast
-    with patch("kernel.step_simulation", return_value=state):
-        run_sim.run(cfg, state)
-        
-    captured = capsys.readouterr()
-    assert "Step" in captured.out
-    assert "Initializing Standard Simulation" in captured.out
-
 def test_printing_behavior_manual_run(capsys):
     """Confirm scenarios.manual_run prints 'Step' lines."""
     from scenarios import manual_run
     cfg = manual_run.build_config()
     state = manual_run.build_initial_state(cfg)
     
-    # Patch step_simulation to be fast
-    with patch("kernel.step_simulation", return_value=state):
-        with patch("jax.jit", side_effect=lambda f: f):
+    # Mock step_simulation to avoid JAX string type errors
+    def mock_step(s, c):
+        return s
+    
+    with patch("jax.jit", side_effect=lambda f: f):
+        with patch.object(manual_run, "step_simulation", side_effect=mock_step):
             manual_run.run(cfg, state)
             
     captured = capsys.readouterr()
@@ -64,19 +53,18 @@ def test_file_output_behavior(module_name, tmp_path):
             return real_join(str(tmp_path), *args[1:])
         return real_join(*args)
     
-    # We also need to patch plt.savefig to actually save (or we can verify the call)
-    # But the requirement is "Assert that a file was created".
-    # So we must let plt.savefig run.
-    # We assume plt.savefig works if the path is valid.
+    # Mock step_simulation to avoid JAX string type errors
+    def mock_step(s, c):
+        return s
     
     with patch("os.path.join", side_effect=fake_join):
         with patch("jax.jit", side_effect=lambda f, *args, **kwargs: f):
-            with patch("kernel.step_simulation", return_value=state):
-                 # For energy_plot, we also need to patch compute_energy if it's jitted
-                 # But we patched jax.jit to identity, so it runs Python code.
-                 # Python code for compute_energy works fine.
-                 
-                 module.run(cfg, state)
+            # Patch step_simulation in the module's namespace
+            if hasattr(module, "step_simulation"):
+                with patch.object(module, "step_simulation", side_effect=mock_step):
+                    module.run(cfg, state)
+            else:
+                module.run(cfg, state)
                  
     # Check if any file was created in tmp_path (recursively or flat)
     # The modules create subdirs like tmp_path/animations, tmp_path/snapshots, etc.

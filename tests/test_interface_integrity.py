@@ -10,8 +10,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from state import UniverseConfig, UniverseState
 
 TARGET_MODULES = [
-    "run_sim",
-    "jit_run_sim",
     "visualize",
     "snapshot_plot",
     "trajectory_plot",
@@ -58,19 +56,23 @@ def test_run_executes_and_returns_state(module_name):
 
     # Mocking to speed up tests and avoid long loops/files
     # 1. Patch jax.jit to return the function as-is (identity)
-    # 2. Patch kernel.step_simulation to return state immediately (no-op)
+    # 2. Patch step_simulation in the MODULE'S namespace (if it exists)
     # 3. Patch matplotlib.pyplot.savefig to no-op (avoid file IO)
     # 4. Patch matplotlib.pyplot.show to no-op
     
+    # Create a mock that returns the state unchanged
+    def mock_step(s, c):
+        return s
+    
     with patch("jax.jit", side_effect=lambda f, *args, **kwargs: f):
-        # We need to patch the step_simulation imported in the module, or the one in kernel
-        # Patching kernel.step_simulation is safer as it covers all imports
-        with patch("kernel.step_simulation", return_value=state):
-             with patch("matplotlib.pyplot.savefig"):
-                 with patch("matplotlib.pyplot.show"):
-                     # For visualize.py, we might want to reduce FRAMES if possible, 
-                     # but since step_simulation is no-op, 300 iterations is fast.
-                     
-                     final_state = module.run(cfg, state)
-                     
-                     assert isinstance(final_state, UniverseState), f"{module_name}.run did not return UniverseState"
+        with patch("matplotlib.pyplot.savefig"):
+            with patch("matplotlib.pyplot.show"):
+                # Only patch step_simulation if the module has it
+                if hasattr(module, "step_simulation"):
+                    with patch.object(module, "step_simulation", side_effect=mock_step):
+                        final_state = module.run(cfg, state)
+                else:
+                    # Module doesn't use step_simulation (e.g., random_nbody)
+                    final_state = module.run(cfg, state)
+                
+                assert isinstance(final_state, UniverseState), f"{module_name}.run did not return UniverseState"

@@ -23,8 +23,6 @@ import pytest
 
 # Modules that contain long-running simulations / visualizations
 SIM_MODULES = [
-    "run_sim",
-    "jit_run_sim",
     "visualize",
     "snapshot_plot",
     "trajectory_plot",

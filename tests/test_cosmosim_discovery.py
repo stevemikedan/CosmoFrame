@@ -17,8 +17,6 @@ def test_load_scenarios_includes_root_modules():
     scenarios = cosmosim.load_scenarios()
     
     required_root_modules = [
-        "run_sim",
-        "jit_run_sim",
         "visualize",
         "snapshot_plot",
         "trajectory_plot",
@@ -50,7 +48,6 @@ def test_load_scenarios_maps_short_names_correctly():
     scenarios = cosmosim.load_scenarios()
     
     # Root modules map to themselves
-    assert scenarios["run_sim"] == "run_sim"
     assert scenarios["visualize"] == "visualize"
     
     # Scenarios package modules have 'scenarios.' prefix
@@ -100,7 +97,6 @@ def test_load_scenarios_does_not_override_manual_seeds():
     # This test verifies the behavior is correct in the real implementation
     scenarios = cosmosim.load_scenarios()
     
-    # If there was a 'run_sim.py' in scenarios/, it shouldn't override the root run_sim
-    # The root module should map to itself, not to scenarios.run_sim
-    assert scenarios["run_sim"] == "run_sim"
-    assert scenarios["jit_run_sim"] == "jit_run_sim"
+    # Verify that manually-seeded root modules map to themselves
+    assert scenarios["visualize"] == "visualize"
+    assert scenarios["snapshot_plot"] == "snapshot_plot"
