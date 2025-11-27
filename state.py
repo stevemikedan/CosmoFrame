@@ -35,6 +35,9 @@ class UniverseConfig:
     bubble_radius: float = 10.0  # Initial bubble size
     bubble_expand: bool = False  # Should the bubble itself inflate?
     curvature_k: float = 0.0  # Curvature parameter for interior metric
+    # Substrate parameters
+    substrate: str = "none"  # "none", "vector"
+    substrate_params: dict | None = None  # Parameters for the substrate
 
 @dataclass
 class UniverseState:

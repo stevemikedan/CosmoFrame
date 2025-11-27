@@ -16,6 +16,8 @@ venv/
 # Output directories
 outputs/**
 frames/**
+sim_output/
+viewer/sim_data/
 !outputs/**/.gitkeep
 
 # JAX compilation cache

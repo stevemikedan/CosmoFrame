@@ -12,6 +12,7 @@ from state import UniverseConfig, UniverseState
 from topologies import get_topology_handler
 from topologies.base_topology import Topology
 from environment.expansion import get_expansion_handler
+from substrate.factory import get_substrate_handler
 
 
 class EnvironmentEngine:
@@ -48,9 +49,8 @@ class EnvironmentEngine:
         topology_name = topology_map.get(topology_type, "flat")
         self.topology: Topology = get_topology_handler(topology_name, config)
         
-        # Substrate placeholder (future implementation)
-        # For now, substrate support is disabled
-        self.substrate = None
+        # Load substrate model
+        self.substrate = get_substrate_handler(config)
         
         # Load expansion handler
         self.expansion = get_expansion_handler(config)
