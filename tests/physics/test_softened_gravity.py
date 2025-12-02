@@ -10,7 +10,6 @@ import jax.numpy as jnp
 import numpy as np
 from state import UniverseConfig
 from physics_utils import compute_gravity_forces
-from distance_utils import compute_offset
 
 
 def test_finite_forces_at_small_separation():
@@ -36,20 +35,11 @@ def test_finite_forces_at_small_separation():
     
     forces = compute_gravity_forces(pos, mass, active, config)
     
-    # DEBUG
-    off = compute_offset(pos[0], pos[1], config)
-    print(f"DEBUG TEST: offset 0->1 = {off}")
-    
-    print(f"DEBUG TEST: config={config}")
-    print(f"DEBUG TEST: pos={pos}")
-    print(f"DEBUG TEST: forces={forces}")
-    
     # Forces should be finite (not NaN or Inf)
     assert jnp.all(jnp.isfinite(forces)), "Forces contain NaN or Inf values"
     
     # Forces should be non-zero (particles are attracting)
     force_magnitude = jnp.linalg.norm(forces[0])
-    print(f"DEBUG TEST: force_magnitude={force_magnitude}")
     assert force_magnitude > 0, "Force magnitude should be non-zero"
     
     # Force should be reasonable (not astronomically large)

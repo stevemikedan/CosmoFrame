@@ -5,7 +5,6 @@ This module contains shared physics computations that can be used across
 different parts of the simulation engine (kernel, run_sim, etc.).
 """
 
-import jax
 import jax.numpy as jnp
 from state import UniverseConfig
 from distance_utils import compute_offset, compute_distance
@@ -28,29 +27,44 @@ def compute_gravity_forces(pos, mass, active, config):
     Returns:
         Array of shape (N, dim) - total gravitational force on each particle
     """
-    # Vectorize compute_offset and compute_distance over all pairs
-    # vmap over pos_j (source), then vmap over pos_i (receiver)
-    # Resulting shapes: (N, N, dim) for offset, (N, N) for distance
+    topology_type = getattr(config, 'topology_type', 0)
     
-    def pairwise_offset(p_i, p_j):
-        return compute_offset(p_i, p_j, config)
+    # FLAT topology: Use optimized vectorized Euclidean calculation
+    if topology_type == 0:
+        # 1. Compute pairwise displacement: r_j - r_i
+        # Shape: (N, N, dim)
+        # disp[i, j] is vector from i to j
+        disp = pos[None, :, :] - pos[:, None, :]
         
-    def pairwise_dist(p_i, p_j):
-        return compute_distance(p_i, p_j, config)
-    
-    # Map over j (inner loop), then i (outer loop)
-    # vmap(vmap(func, (None, 0)), (0, None))
-    
-    # 1. Compute pairwise displacements and distances respecting topology
-    # disp[i, j] is vector from i to j
-    disp = jax.vmap(jax.vmap(pairwise_offset, (None, 0)), (0, None))(pos, pos)
-    
-    # dist[i, j] is scalar distance between i and j
-    dist = jax.vmap(jax.vmap(pairwise_dist, (None, 0)), (0, None))(pos, pos)
-    
-    # 2. Apply softening: (r^2 + epsilon^2)^(3/2)
-    epsilon = config.gravity_softening
-    softened_dist_cubed = (dist**2 + epsilon**2)**1.5
+        # 2. Compute distances with softening
+        # Shape: (N, N)
+        dist_sq = jnp.sum(disp**2, axis=-1)
+        
+        # Apply softening: (r^2 + epsilon^2)^(3/2)
+        epsilon = config.gravity_softening
+        softened_dist_cubed = (dist_sq + epsilon**2)**1.5
+        
+    # NON-FLAT topologies: Use topology-aware calculations
+    else:
+        # For non-flat topologies, we need to use compute_offset and compute_distance
+        # This is less performant but necessary for correct topology handling
+        import jax
+        
+        def pairwise_offset(p_i, p_j):
+            return compute_offset(p_i, p_j, config)
+            
+        def pairwise_dist(p_i, p_j):
+            return compute_distance(p_i, p_j, config)
+        
+        # Vectorize over all pairs using vmap
+        # disp[i, j] is offset from i to j
+        # dist[i, j] is distance from i to j
+        disp = jax.vmap(jax.vmap(pairwise_offset, (None, 0)), (0, None))(pos, pos)
+        dist = jax.vmap(jax.vmap(pairwise_dist, (None, 0)), (0, None))(pos, pos)
+        
+        # Apply softening
+        epsilon = config.gravity_softening
+        softened_dist_cubed = (dist**2 + epsilon**2)**1.5
     
     # Mask mass of inactive entities so they don't exert gravity
     # Shape: (N,)
@@ -65,11 +79,8 @@ def compute_gravity_forces(pos, mass, active, config):
     
     # 4. Compute force vectors
     # force_vec[i, j] = force from j on i
-    # We need the direction (unit vector) from i to j
-    # For softened gravity, we use: F_vec = F_mag * displacement
-    # Note: For sphere/bubble, disp is the tangent/offset vector
+    # We use the offset vector (which already has the correct direction)
     # Shape: (N, N, dim)
-    
     force_vec = force_mag[:, :, None] * disp
     
     # Sum forces on each entity i (sum over j)
