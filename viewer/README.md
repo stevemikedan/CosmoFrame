@@ -17,7 +17,7 @@ This viewer runs the simulation live within Python. It is designed for immediate
 **Usage:**
 ```bash
 # Run with default test scenario
-python viewer/viewer.py
+python cosmosim.py --scenario bulk_ring --view debug
 
 # Import in your script
 from viewer.viewer import Viewer
@@ -39,7 +39,7 @@ This viewer runs in the browser using Three.js. It plays back pre-computed simul
 **Usage:**
 1. **Export Data**:
    ```bash
-   python cosmosim.py --scenario scenarios.bulk_ring --export-json --steps 500
+   python cosmosim.py --scenario bulk_ring --view web --export-json --steps 500
    ```
    Data will be saved to `outputs/frames/`.
 

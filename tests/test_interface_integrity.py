@@ -10,10 +10,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from state import UniverseConfig, UniverseState
 
 TARGET_MODULES = [
-    "visualize",
-    "snapshot_plot",
-    "trajectory_plot",
-    "energy_plot",
+    "plotting.visualize",
+    "plotting.snapshot_plot",
+    "plotting.trajectory_plot",
+    "plotting.energy_plot",
     "scenarios.manual_run",
     "scenarios.random_nbody",
     "scenarios.scenario_runner",

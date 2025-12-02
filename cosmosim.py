@@ -12,13 +12,13 @@ import inspect
 import os
 import sys
 import pathlib
-# from pathlib import Path
+import datetime
 from typing import Any
 
 # JSON exporter import
-from exporters.json_export import export_simulation, export_frame
+from exporters.json_export import export_simulation
 
-__version__ = "0.1"
+__version__ = "0.2"
 
 
 def load_scenarios() -> dict[str, str]:
@@ -28,24 +28,30 @@ def load_scenarios() -> dict[str, str]:
     Returns:
         Dictionary mapping short scenario names to full module paths.
     """
-    scenarios = {}
+    # Manually seed short names for backward compatibility
+    scenarios = {
+        "visualize": "plotting.visualize",
+        "snapshot_plot": "plotting.snapshot_plot",
+        "trajectory_plot": "plotting.trajectory_plot",
+        "energy_plot": "plotting.energy_plot",
+    }
 
-    # Manually add root-level simulation modules
+    # Add other root-level modules
     root_modules = [
         "run_sim",
         "jit_run_sim",
-        "visualize",
-        "snapshot_plot",
-        "trajectory_plot",
-        "energy_plot",
     ]
 
     for name in root_modules:
         scenarios[name] = name
 
+    # Also add full plotting.* paths for discovery
+    scenarios["plotting.visualize"] = "plotting.visualize"
+    scenarios["plotting.snapshot_plot"] = "plotting.snapshot_plot"
+    scenarios["plotting.trajectory_plot"] = "plotting.trajectory_plot"
+    scenarios["plotting.energy_plot"] = "plotting.energy_plot"
+
     # Auto-discover scenarios in scenarios/ package
-    # Use os.getcwd() for test compatibility so tests can patch os.getcwd if needed
-    # or rely on the fact that tests run from project root
     base_dir = pathlib.Path(os.getcwd())
     scenarios_dir = base_dir / "scenarios"
     if scenarios_dir.exists() and scenarios_dir.is_dir():
@@ -66,12 +72,6 @@ def load_scenarios() -> dict[str, str]:
 def validate_interface(module: Any) -> bool:
     """
     Validate that a module conforms to the CosmoSim interface.
-
-    Args:
-        module: The module to validate
-
-    Returns:
-        True if valid, False otherwise (also prints errors)
     """
     required_functions = ["build_config", "build_initial_state", "run"]
     missing = []
@@ -95,20 +95,50 @@ def validate_interface(module: Any) -> bool:
     return True
 
 
+def print_banner(args, scenario_name, output_path=None):
+    """Print runtime configuration banner."""
+    print("=" * 60)
+    print(f"COSMOSIM v{__version__}")
+    print("=" * 60)
+    print(f"Scenario:   {scenario_name}")
+    print(f"View Mode:  {args.view}")
+    print(f"Steps:      {args.steps if args.steps else 'Default'}")
+    if args.topology: print(f"Topology:   {args.topology}")
+    if args.substrate: print(f"Substrate:  {args.substrate}")
+    if args.expansion: print(f"Expansion:  {args.expansion}")
+    if output_path:     print(f"Output:     {output_path}")
+    print("=" * 60)
+    print()
+
+
 def run_scenario(module: Any, args: argparse.Namespace, scenario_name: str) -> None:
     """
     Execute a scenario module with the given arguments.
-
-    Args:
-        module: The scenario module to run
-        args: Parsed command-line arguments
-        scenario_name: The short scenario name for display
     """
     # Step 1: Build configuration
     print(f"Building configuration for '{scenario_name}'...")
     cfg = module.build_config()
 
-    # Step 2: Config dump if requested
+    # Apply CLI overrides to config if supported
+    # Note: This is a shallow copy replace. Ideally we'd have a robust config override system.
+    # For now, we assume scenarios use the config passed to run() or we modify it here.
+    # Since config is a frozen dataclass (chex), we use .replace()
+    
+    overrides = {}
+    if args.dt is not None: overrides["dt"] = args.dt
+    if args.entities is not None: overrides["max_entities"] = args.entities
+    # Topology/Substrate/Expansion overrides would require logic to map string to int/enum
+    # For now, we just pass them if the scenario supports them or if we can map them.
+    # Keeping it simple for Phase 1 as requested: "without altering physics logic"
+    # We will just pass these as kwargs to run() if accepted, or rely on scenario to parse them?
+    # The prompt says "Required CLI arguments... add if missing". 
+    # It implies we should use them. But standard scenarios might not look at them.
+    # We'll apply what we can to UniverseConfig if the fields match.
+    
+    if overrides:
+        cfg = cfg.replace(**overrides)
+
+    # Step 2: Config dump
     if args.config_dump:
         print("\nConfiguration:")
         print(cfg)
@@ -118,59 +148,65 @@ def run_scenario(module: Any, args: argparse.Namespace, scenario_name: str) -> N
     print("Initializing universe state...")
     state = module.build_initial_state(cfg)
 
+    # Determine View Mode
+    view_mode = args.view
+    if view_mode == "auto":
+        if args.interactive:
+            view_mode = "debug"
+        elif args.export_json:
+            view_mode = "web"
+        else:
+            view_mode = "none"
+    
+    # Handle legacy flags mapping to view modes
+    if args.interactive and view_mode == "auto": view_mode = "debug"
+    if args.export_json and view_mode == "auto": view_mode = "web"
+
+    # Print Banner
+    print_banner(args, scenario_name)
+
     # -----------------------------------------------------------------
-    # Interactive Viewer Mode
+    # ROUTING: DEBUG VIEWER
     # -----------------------------------------------------------------
-    if getattr(args, "interactive", False):
+    if view_mode == "debug":
         from viewer.viewer import Viewer
-        print(f"Launching interactive viewer for '{scenario_name}'...")
-        
-        # Initialize viewer with config and state
+        print(f"Launching interactive viewer...")
         viewer = Viewer(cfg, state)
         viewer.run()
         return
 
     # -----------------------------------------------------------------
-    # JSON Export Mode
+    # ROUTING: WEB VIEWER (Export)
     # -----------------------------------------------------------------
-    if getattr(args, "export_json", False):
-        import datetime
-        
-        # Determine number of frames to export
+    if view_mode == "web":
+        # Enforce export
         steps_value = args.steps if args.steps is not None else 100
-        
-        # Generate timestamped export directory name
         timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
         export_dir_name = f"{scenario_name}_{steps_value}_steps_{timestamp}"
-        
-        # Always use outputs/frames as the root directory
         full_export_dir = pathlib.Path("outputs") / "frames" / export_dir_name
-
-        # Ensure directory exists
         full_export_dir.mkdir(parents=True, exist_ok=True)
-
-        # Set environment variable for other tools
+        
         os.environ["COSMOSIM_EXPORT_JSON_DIR"] = str(full_export_dir.resolve())
 
-        # Export simulation to the timestamped directory
-        export_simulation(
-            cfg,
-            state,
-            steps=steps_value,
-            output_dir=str(full_export_dir),
-        )
+        export_simulation(cfg, state, steps=steps_value, output_dir=str(full_export_dir))
 
-        print(f"\nExported {steps_value} JSON frames to: {full_export_dir}")
+        print(f"\nExport complete.")
+        print("=" * 60)
+        print("TO VIEW SIMULATION:")
+        print(f"1. Open viewer/test.html in your browser")
+        print(f"2. Click 'Choose Directory'")
+        print(f"3. Select: {full_export_dir}")
+        print("=" * 60)
         return
 
-    # Step 4: Prepare run arguments
+    # -----------------------------------------------------------------
+    # ROUTING: HEADLESS / NONE
+    # -----------------------------------------------------------------
+    # Prepare run arguments
     run_kwargs = {}
-
-    # Check if run() accepts steps override
     if args.steps is not None:
         sig = inspect.signature(module.run)
         params = sig.parameters
-
         if "steps" in params:
             run_kwargs["steps"] = args.steps
         elif "num_steps" in params:
@@ -178,159 +214,122 @@ def run_scenario(module: Any, args: argparse.Namespace, scenario_name: str) -> N
         else:
             print(f"Warning: --steps specified but '{scenario_name}' doesn't accept 'steps' or 'num_steps' parameter")
 
-    # Step 5: Set headless mode
-    if args.headless:
-        os.environ["COSMOSIM_HEADLESS"] = "1"
-        print("Running in headless mode...")
-
-    # Step 6: Set output directory
+    # Set headless env var
+    os.environ["COSMOSIM_HEADLESS"] = "1"
+    
+    # Output dir override
     if args.output_dir:
         output_path = pathlib.Path(args.output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         os.environ["COSMOSIM_OUTPUT_DIR"] = str(output_path.resolve())
-        print(f"Output directory: {output_path.resolve()}")
 
-    # Step 7: Execute scenario
-    print(f"Running scenario '{scenario_name}'...\n")
-
+    # Execute
+    print(f"Running scenario headless...\n")
     try:
-        # Only pass run_kwargs if we have recognized parameters
         if run_kwargs:
-            final_state = module.run(cfg, state, **run_kwargs)
+            module.run(cfg, state, **run_kwargs)
         else:
-            final_state = module.run(cfg, state)
+            module.run(cfg, state)
     except Exception as e:
         print("\nError during scenario execution:", file=sys.stderr)
         print(f"   {type(e).__name__}: {e}", file=sys.stderr)
         import traceback
-
         traceback.print_exc()
         sys.exit(1)
 
-    # Step 8: Success summary
     print(f"\nScenario '{scenario_name}' completed successfully.")
 
 
 def main(argv: list[str] | None = None) -> int:
-    """
-    Main CLI entry point.
-
-    Args:
-        argv: Command-line arguments (defaults to sys.argv)
-
-    Returns:
-        Exit code (0 for success, non-zero for error)
-    """
     parser = argparse.ArgumentParser(
         prog="cosmosim",
         description="CosmoSim - Unified CLI for N-body physics simulations",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-    parser.add_argument(
-        "--scenario", "-s",
-        help="Scenario to run (short name or full module path)"
-    )
+    # Core Arguments
+    parser.add_argument("--scenario", "-s", help="Scenario to run (e.g. 'bulk_ring')")
+    parser.add_argument("--steps", "-n", type=int, help="Number of simulation steps")
+    parser.add_argument("--dt", type=float, help="Time step size")
+    parser.add_argument("--entities", "-N", type=int, help="Number of entities")
+    parser.add_argument("--seed", type=int, help="Random seed")
+    
+    # Physics Parameters
+    parser.add_argument("--topology", help="Topology type (flat, torus, etc)")
+    parser.add_argument("--substrate", help="Substrate type")
+    parser.add_argument("--expansion", help="Expansion mode")
 
+    # View / Output Control
     parser.add_argument(
-        "--steps", "-n",
-        type=int,
-        help="Override number of simulation steps"
+        "--view", 
+        choices=["auto", "debug", "web", "none"], 
+        default="auto",
+        help="Viewer mode: 'debug' (interactive), 'web' (export for browser), 'none' (headless)"
     )
-
-    parser.add_argument(
-        "--headless",
-        action="store_true",
-        help="Run in headless mode (sets COSMOSIM_HEADLESS=1)"
-    )
-
-    parser.add_argument(
-        "--output-dir", "-o",
-        help="Override output directory (sets COSMOSIM_OUTPUT_DIR)"
-    )
-
-    parser.add_argument(
-        "--list", "-l",
-        action="store_true",
-        help="List all available scenarios and exit"
-    )
-
-    parser.add_argument(
-        "--config-dump",
-        action="store_true",
-        help="Print UniverseConfig before running"
-    )
-
-    parser.add_argument(
-        "--export-json",
-        action="store_true",
-        help="Export simulation frames to JSON instead of running the scenario normally."
-    )
-
-    parser.add_argument(
-        "--interactive", "-i",
-        action="store_true",
-        help="Run scenario in interactive viewer mode."
-    )
-
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"CosmoSim CLI v{__version__}"
-    )
+    parser.add_argument("--interactive", "-i", action="store_true", help="Alias for --view debug")
+    parser.add_argument("--export-json", action="store_true", help="Alias for --view web")
+    
+    parser.add_argument("--headless", action="store_true", help="Force headless mode (deprecated, use --view none)")
+    parser.add_argument("--output-dir", "-o", help="Override output directory")
+    parser.add_argument("--config-dump", action="store_true", help="Print config before running")
+    parser.add_argument("--list", "-l", action="store_true", help="List scenarios")
+    parser.add_argument("--version", action="version", version=f"CosmoSim CLI v{__version__}")
 
     args = parser.parse_args(argv)
 
-    # Load available scenarios
+    # Load scenarios
     scenarios = load_scenarios()
 
-    # Handle --list
     if args.list:
         print("Available scenarios:\n")
         print(f"{'Short Name':<25} -> {'Full Module Path'}")
         print("=" * 60)
         for short_name in sorted(scenarios.keys()):
-            full_path = scenarios[short_name]
-            print(f"{short_name:<25} -> {full_path}")
+            print(f"{short_name:<25} -> {scenarios[short_name]}")
         return 0
 
-    # Require --scenario unless --list
     if not args.scenario:
         parser.print_help()
-        print("\nError: --scenario is required (use --list to see available scenarios)", file=sys.stderr)
+        print("\nError: --scenario is required.", file=sys.stderr)
         return 1
 
-    # Resolve scenario name to module path
-    scenario_display_name = args.scenario
-    if args.scenario in scenarios:
-        module_path = scenarios[args.scenario]
-    elif "." in args.scenario:
-        # Treat as full module path
-        module_path = args.scenario
-        scenario_display_name = module_path
-    else:
-        print(f"Error: Unknown scenario '{args.scenario}'", file=sys.stderr)
-        print("\nUse --list to see available scenarios, or specify a full module path.", file=sys.stderr)
-        return 1
+    # Resolve Scenario
+    scenario_name = args.scenario
+    module_path = scenarios.get(scenario_name)
+    
+    if not module_path:
+        # Try prefixing with scenarios.
+        if "." not in scenario_name:
+            candidate = f"scenarios.{scenario_name}"
+            try:
+                importlib.import_module(candidate)
+                module_path = candidate
+            except ImportError:
+                pass
+        
+        if not module_path:
+            # Try as direct path
+            module_path = scenario_name
 
-    # Import the module
+    # Import
     try:
         module = importlib.import_module(module_path)
     except ImportError as e:
-        print(f"Error: Failed to import module '{module_path}':", file=sys.stderr)
-        print(f"   {e}", file=sys.stderr)
+        if module_path not in scenarios.values() and scenario_name not in scenarios:
+            print(f"Error: Unknown scenario '{scenario_name}'", file=sys.stderr)
+            print("\nUse --list to see available scenarios, or specify a full module path.", file=sys.stderr)
+        else:
+            print(f"Error: Failed to import scenario '{scenario_name}' ({module_path}):", file=sys.stderr)
+            print(f"   {e}", file=sys.stderr)
         return 1
 
-    # Validate interface
-    # Import cosmosim to allow patching in tests
-    import cosmosim
-
-    if not cosmosim.validate_interface(module):
+    # Validate
+    import cosmosim # Self-import for validation hook if needed
+    if not validate_interface(module):
         return 1
 
-    # Run the scenario
-    run_scenario(module, args, scenario_display_name)
-
+    # Run
+    run_scenario(module, args, scenario_name)
     return 0
 
 

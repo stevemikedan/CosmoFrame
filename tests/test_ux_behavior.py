@@ -29,10 +29,10 @@ def test_printing_behavior_manual_run(capsys):
     assert "Running manual physics test" in captured.out
 
 FILE_OUTPUT_MODULES = [
-    "visualize",
-    "snapshot_plot",
-    "trajectory_plot",
-    "energy_plot",
+    "plotting.visualize",
+    "plotting.snapshot_plot",
+    "plotting.trajectory_plot",
+    "plotting.energy_plot",
 ]
 
 @pytest.mark.parametrize("module_name", FILE_OUTPUT_MODULES)

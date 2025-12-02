@@ -25,7 +25,7 @@ def test_load_scenarios_includes_root_modules():
     
     for module_name in required_root_modules:
         assert module_name in scenarios, f"Missing root module: {module_name}"
-        assert scenarios[module_name] == module_name
+        assert scenarios[module_name] == f"plotting.{module_name}"
 
 
 def test_load_scenarios_discovers_scenario_package_modules():
@@ -47,8 +47,8 @@ def test_load_scenarios_maps_short_names_correctly():
     """Verify short names map to correct full module paths."""
     scenarios = cosmosim.load_scenarios()
     
-    # Root modules map to themselves
-    assert scenarios["visualize"] == "visualize"
+    # Root modules map to plotting.*
+    assert scenarios["visualize"] == "plotting.visualize"
     
     # Scenarios package modules have 'scenarios.' prefix
     assert scenarios["manual_run"] == "scenarios.manual_run"
@@ -97,6 +97,6 @@ def test_load_scenarios_does_not_override_manual_seeds():
     # This test verifies the behavior is correct in the real implementation
     scenarios = cosmosim.load_scenarios()
     
-    # Verify that manually-seeded root modules map to themselves
-    assert scenarios["visualize"] == "visualize"
-    assert scenarios["snapshot_plot"] == "snapshot_plot"
+    # Verify that manually-seeded root modules map to plotting.*
+    assert scenarios["visualize"] == "plotting.visualize"
+    assert scenarios["snapshot_plot"] == "plotting.snapshot_plot"

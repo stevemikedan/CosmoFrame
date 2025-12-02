@@ -7,6 +7,10 @@ by saving the output to outputs/animations/ with timestamp.
 """
 
 import os
+import sys
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 import datetime
 import matplotlib
 matplotlib.use("Agg")  # Non-interactive backend

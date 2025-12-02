@@ -19,10 +19,10 @@ OUTPUT_ROOT = Path("outputs")
 SUBDIRS = ["snapshots", "energy", "trajectories", "animations"]
 
 VIS_SCRIPTS = [
-    "trajectory_plot",
-    "snapshot_plot",
-    "energy_plot",
-    "visualize",
+    "plotting.trajectory_plot",
+    "plotting.snapshot_plot",
+    "plotting.energy_plot",
+    "plotting.visualize",
 ]
 
 
@@ -45,7 +45,7 @@ def test_output_directories_exist():
 def run_script(script_name):
     """Helper: run a script via subprocess and ensure no crash."""
     import sys
-    cmd = [sys.executable, f"{script_name}.py"] 
+    cmd = [sys.executable, f"{script_name.replace('.', '/')}.py"] 
     try:
         subprocess.run(cmd, check=True, timeout=20)
     except Exception as e:

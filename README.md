@@ -264,22 +264,4 @@ All code must pass both test suites
 
 Engine modules should not be modified outside their designated sprint
 
-Visualization structure must remain consistent
-
-PRs require updated tests for new features
-
-🪐 Why CosmoSim?
-
-CosmoSim is not just a simulation engine.
-
-It is:
-
-A research tool for studying emergent cosmology
-
-A sandbox for AI-driven physics exploration
-
-A teaching tool for JAX & differentiable programming
-
-A platform for building universes as modular, comparable models
-
 It’s designed to grow with your vision — including your long-term cosmological and philosophical frameworks.

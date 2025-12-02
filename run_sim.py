@@ -1,7 +1,13 @@
 """
-CLI Scenario Runner for CosmoSim.
+LEGACY RUNNER
 
-Allows testing substrates, expansion, and topology from the command line.
+This script is preserved for internal debugging and historical workflows.
+For all normal usage (scenario loading, viewer routing, playback), use:
+
+  python cosmosim.py --scenario bulk_ring --view debug
+  python cosmosim.py --scenario bulk_ring --view web --export-json
+
+This file may be moved into a `legacy/` directory in future cleanups.
 """
 
 import argparse

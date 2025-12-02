@@ -308,13 +308,20 @@ def test_run_scenario_export_json_default_dir(mock_datetime, mock_environ, mock_
         output_dir=None,
         export_json=True,
         config_dump=False,
+        dt=None,
+        entities=None,
+        topology=None,
+        substrate=None,
+        expansion=None,
+        view="auto",
+        interactive=False,
     )
     
     # Run
     cosmosim.run_scenario(fake_module, args, "test_scenario")
     
     # Verify export_simulation called with timestamped directory
-    expected_dir = str(Path("frames") / "test_scenario_50_steps_2025-11-26T23-15-19")
+    expected_dir = str(Path("outputs") / "frames" / "test_scenario_50_steps_2025-11-26T23-15-19")
     mock_export.assert_called_once_with(
         fake_cfg, fake_state, steps=50, output_dir=expected_dir
     )
@@ -351,13 +358,20 @@ def test_run_scenario_export_json_steps_default(mock_datetime, mock_export):
         output_dir=None,
         export_json=True,
         config_dump=False,
+        dt=None,
+        entities=None,
+        topology=None,
+        substrate=None,
+        expansion=None,
+        view="auto",
+        interactive=False,
     )
     
     # Run
     cosmosim.run_scenario(fake_module, args, "test_scenario")
     
     # Verify export_simulation called with default steps (100) and timestamped directory
-    expected_dir = str(Path("frames") / "test_scenario_100_steps_2025-11-26T23-15-19")
+    expected_dir = str(Path("outputs") / "frames" / "test_scenario_100_steps_2025-11-26T23-15-19")
     mock_export.assert_called_once_with(
         fake_cfg, fake_state, steps=100, output_dir=expected_dir
     )
@@ -409,6 +423,13 @@ def test_run_scenario_normal_mode():
         export_json=False,  # normal mode
         export_json_dir=None,
         config_dump=False,
+        dt=None,
+        entities=None,
+        topology=None,
+        substrate=None,
+        expansion=None,
+        view="auto",
+        interactive=False,
     )
     
     with patch("cosmosim.export_simulation") as mock_export:
