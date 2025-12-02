@@ -233,17 +233,26 @@ class Viewer:
                 # Cap framerate roughly
                 elapsed = time.time() - start_time
                 delay = max(0.001, 0.016 - elapsed) # ~60 FPS cap
-                # plt.pause handles the GUI event loop
-                plt.pause(delay)
                 
-                if not plt.fignum_exists(self.fig.number):
-                    print("Window closed.")
+                # Handle window events
+                try:
+                    if not plt.fignum_exists(self.fig.number):
+                        print("Window closed.")
+                        break
+                    
+                    # plt.pause handles the GUI event loop
+                    plt.pause(delay)
+                except Exception:
+                    # Catch TclError or other GUI issues on exit
                     break
                     
         except KeyboardInterrupt:
             print("\nStopped by user.")
         finally:
-            plt.close()
+            try:
+                plt.close('all')
+            except:
+                pass
 
 # Simple test runner
 if __name__ == "__main__":

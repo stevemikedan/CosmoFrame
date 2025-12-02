@@ -119,20 +119,32 @@ def run_scenario(module: Any, args: argparse.Namespace, scenario_name: str) -> N
     state = module.build_initial_state(cfg)
 
     # -----------------------------------------------------------------
+    # Interactive Viewer Mode
+    # -----------------------------------------------------------------
+    if getattr(args, "interactive", False):
+        from viewer.viewer import Viewer
+        print(f"Launching interactive viewer for '{scenario_name}'...")
+        
+        # Initialize viewer with config and state
+        viewer = Viewer(cfg, state)
+        viewer.run()
+        return
+
+    # -----------------------------------------------------------------
     # JSON Export Mode
     # -----------------------------------------------------------------
     if getattr(args, "export_json", False):
         import datetime
-
+        
         # Determine number of frames to export
         steps_value = args.steps if args.steps is not None else 100
-
+        
         # Generate timestamped export directory name
         timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
         export_dir_name = f"{scenario_name}_{steps_value}_steps_{timestamp}"
         
-        # Always use frames as the root directory
-        full_export_dir = pathlib.Path("frames") / export_dir_name
+        # Always use outputs/frames as the root directory
+        full_export_dir = pathlib.Path("outputs") / "frames" / export_dir_name
 
         # Ensure directory exists
         full_export_dir.mkdir(parents=True, exist_ok=True)
@@ -253,6 +265,12 @@ def main(argv: list[str] | None = None) -> int:
         "--export-json",
         action="store_true",
         help="Export simulation frames to JSON instead of running the scenario normally."
+    )
+
+    parser.add_argument(
+        "--interactive", "-i",
+        action="store_true",
+        help="Run scenario in interactive viewer mode."
     )
 
     parser.add_argument(
