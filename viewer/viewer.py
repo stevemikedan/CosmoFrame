@@ -17,6 +17,7 @@ from viewer.overlays.debug import DebugOverlay
 from viewer.overlays.inspector import InspectorOverlay
 from viewer.overlays.vectors import VectorOverlay
 from viewer.overlays.trajectories import TrajectoryOverlay
+from viewer.metrics import MetricsEngine
 
 class Viewer:
     """Interactive viewer for CosmoSim simulations."""
@@ -34,6 +35,7 @@ class Viewer:
         self.show_velocity_vectors = False
         self.show_acceleration_vectors = False
         self.show_trajectories = False
+        self.show_diagnostics_panel = False
         
         self.color_mode = "type"  # "type", "constant", "velocity"
         self.render_radius_mode = "constant"  # "constant", "scaled"
@@ -52,6 +54,12 @@ class Viewer:
         
         # Metrics Log
         self.metrics_log = []
+        
+        # Metrics Engine
+        self.metrics = MetricsEngine()
+        self.diagnostics_fig = None
+        self.diagnostics_axes = None
+        self.frame_idx = 0
         
         # Setup Plot
         plt.ion()  # Interactive mode
@@ -106,6 +114,23 @@ class Viewer:
         elif key == 'i':
             self.show_inspector = not self.show_inspector
             
+        # Diagnostics
+        elif key == 'D':  # Shift+D for diagnostics panel
+            self.show_diagnostics_panel = not self.show_diagnostics_panel
+            if not self.show_diagnostics_panel and self.diagnostics_fig:
+                plt.close(self.diagnostics_fig)
+                self.diagnostics_fig = None
+        elif key == 'e':
+            self.metrics.toggle('energy')
+        elif key == 'm':
+            self.metrics.toggle('momentum')
+        elif key == 'C':  # Shift+C for COM (c is used for color)
+            self.metrics.toggle('com')
+        elif key == 'h':
+            self.metrics.toggle('velocity_hist')
+        elif key == 'u':
+            self.metrics.toggle('substrate_diag')
+            
         # Reset
         elif key == 'R':
             self.reset()
@@ -151,6 +176,17 @@ class Viewer:
         step_config = self.config.replace(dt=current_dt)
         
         self.state = step_simulation(self.state, step_config)
+        
+        # Update metrics engine
+        self.frame_idx += 1
+        state_dict = {
+            'pos': np.array(self.state.entity_pos),
+            'vel': np.array(self.state.entity_vel),
+            'mass': np.array(self.state.entity_mass),
+            'active': np.array(self.state.entity_active),
+            'diagnostics': {}  # Could be populated from state.extra if available
+        }
+        self.metrics.update(self.frame_idx, state_dict)
         
         # Logging
         self.metrics_log.append({
@@ -218,6 +254,103 @@ class Viewer:
             
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
+        
+        # Render diagnostics panel (separate figure)
+        if self.show_diagnostics_panel and self.frame_idx % 10 == 0:  # Update at ~4-5 FPS (every 10 frames)
+            self.render_diagnostics_panel()
+            
+    def render_diagnostics_panel(self):
+        """Render metrics diagnostics in separate figure."""
+        # Create figure if needed
+        if self.diagnostics_fig is None:
+            self.diagnostics_fig, self.diagnostics_axes = plt.subplots(2, 2, figsize=(12, 10))
+            self.diagnostics_fig.suptitle('CosmoSim Diagnostics', fontsize=14, color='white')
+            self.diagnostics_fig.patch.set_facecolor('#111111')
+            plt.ion()
+        
+        # Clear all axes
+        for ax_row in self.diagnostics_axes:
+            for ax in ax_row:
+                ax.clear()
+                ax.set_facecolor('#222222')
+                ax.tick_params(colors='white')
+                ax.spines['bottom'].set_color('white')
+                ax.spines['left'].set_color('white')
+                ax.spines['top'].set_color('white')
+                ax.spines['right'].set_color('white')
+        
+        # Plot Energy (top-left)
+        if self.metrics.enabled.get('energy') and len(self.metrics.energy_history) > 0:
+            history = np.array(self.metrics.energy_history)
+            frames = history[:, 0]
+            ke = history[:, 1]
+            pe = history[:, 2]
+            te = history[:, 3]
+            
+            ax = self.diagnostics_axes[0, 0]
+            ax.plot(frames, ke, 'b-', label='KE', alpha=0.8)
+            if not np.all(np.isnan(pe)):
+                ax.plot(frames, pe, 'r-', label='PE', alpha=0.8)
+            if not np.all(np.isnan(te)):
+                ax.plot(frames, te, 'g-', label='Total', alpha=0.8)
+            ax.set_xlabel('Frame', color='white')
+            ax.set_ylabel('Energy', color='white')
+            ax.set_title('Energy', color='white')
+            ax.legend(facecolor='#333333', edgecolor='white', labelcolor='white')
+            ax.grid(True, alpha=0.2, color='white')
+        
+        # Plot Momentum (top-right)
+        if self.metrics.enabled.get('momentum') and len(self.metrics.momentum_history) > 0:
+            history = np.array(self.metrics.momentum_history)
+            frames = history[:, 0]
+            px = history[:, 1]
+            py = history[:, 2]
+            pz = history[:, 3]
+            
+            ax = self.diagnostics_axes[0, 1]
+            ax.plot(frames, px, 'r-', label='px', alpha=0.8)
+            ax.plot(frames, py, 'g-', label='py', alpha=0.8)
+            if not np.all(pz == 0):
+                ax.plot(frames, pz, 'b-', label='pz', alpha=0.8)
+            ax.set_xlabel('Frame', color='white')
+            ax.set_ylabel('Momentum', color='white')
+            ax.set_title('Momentum', color='white')
+            ax.legend(facecolor='#333333', edgecolor='white', labelcolor='white')
+            ax.grid(True, alpha=0.2, color='white')
+        
+        # Plot COM (bottom-left)
+        if self.metrics.enabled.get('com') and len(self.metrics.com_history) > 0:
+            history = np.array(self.metrics.com_history)
+            frames = history[:, 0]
+            cx = history[:, 1]
+            cy = history[:, 2]
+            cz = history[:, 3]
+            
+            ax = self.diagnostics_axes[1, 0]
+            ax.plot(frames, cx, 'r-', label='cx', alpha=0.8)
+            ax.plot(frames, cy, 'g-', label='cy', alpha=0.8)
+            if not np.all(cz == 0):
+                ax.plot(frames, cz, 'b-', label='cz', alpha=0.8)
+            ax.set_xlabel('Frame', color='white')
+            ax.set_ylabel('Position', color='white')
+            ax.set_title('Center of Mass', color='white')
+            ax.legend(facecolor='#333333', edgecolor='white', labelcolor='white')
+            ax.grid(True, alpha=0.2, color='white')
+        
+        # Plot Velocity Histogram (bottom-right)
+        if self.metrics.enabled.get('velocity_hist') and self.metrics.vel_hist_data:
+            counts, bin_edges = self.metrics.vel_hist_data
+            ax = self.diagnostics_axes[1, 1]
+            bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+            ax.bar(bin_centers, counts, width=np.diff(bin_edges), color='cyan', alpha=0.7, edgecolor='white')
+            ax.set_xlabel('|Velocity|', color='white')
+            ax.set_ylabel('Count', color='white')
+            ax.set_title('Velocity Distribution', color='white')
+            ax.grid(True, alpha=0.2, color='white')
+        
+        # Update canvas
+        self.diagnostics_fig.canvas.draw()
+        self.diagnostics_fig.canvas.flush_events()
         
     def run(self):
         """Main loop."""
