@@ -215,6 +215,24 @@ def load_scenario_schema(module: Any) -> dict | None:
     return schema
 
 
+def load_scenario_presets(module: Any) -> dict | None:
+    """
+    Extract SCENARIO_PRESETS from module if present.
+    
+    Returns:
+        dict of presets or None if not defined
+    """
+    if not hasattr(module, 'SCENARIO_PRESETS'):
+        return None
+    
+    presets = module.SCENARIO_PRESETS
+    if not isinstance(presets, dict):
+        print(f"[PSS WARNING] Invalid presets format in module '{module.__name__}' (not a dict)")
+        return None
+        
+    return presets
+
+
 def merge_params(schema: dict | None, cli_params: dict) -> dict:
     """
     Merge CLI parameters with schema defaults using robust validation.
@@ -361,24 +379,118 @@ def run_scenario(module: Any, args: argparse.Namespace, scenario_name: str) -> N
 
     # Step 2.5: PSS - Parameterized Scenario System
     schema = load_scenario_schema(module)
+    presets = load_scenario_presets(module)
     cli_params = parse_param_string(getattr(args, 'params', None))
+    preset_name = getattr(args, 'preset', None)
     
-    # Case C: No schema but params provided
-    if not schema and cli_params:
-        print("[PSS WARNING] Scenario does not define SCENARIO_PARAMS; ignoring --params.")
-        merged_params = {}
-    else:
-        merged_params = merge_params(schema, cli_params)
+    merged_params = {}
     
-    # PSS Logging
+    # 1. Start with Schema Defaults
     if schema:
-        if cli_params:
-            # Case B: Schema exists & CLI overrides supplied
-            print(f"[PSS] Applied CLI overrides: {cli_params}")
-            print(f"[PSS] Final merged parameters: {merged_params}")
+        for key, spec in schema.items():
+            if 'default' in spec:
+                merged_params[key] = spec['default']
+                
+    # 2. Apply Preset Overrides
+    if preset_name:
+        if not presets:
+            print("[PSS WARNING] Scenario does not define SCENARIO_PRESETS; ignoring --preset")
+        elif preset_name not in presets:
+            print(f"[PSS WARNING] Unknown preset '{preset_name}' for scenario '{scenario_name}'")
         else:
-            # Case A: Schema exists & no CLI overrides
-            print(f"[PSS] Using schema defaults: {merged_params}")
+            print(f"[PSS] Using preset '{preset_name}'")
+            preset_values = presets[preset_name]
+            
+            # Merge preset values (validated later)
+            for key, value in preset_values.items():
+                merged_params[key] = value
+                
+            print(f"[PSS] Preset overrides: {preset_values}")
+
+    # 3. Apply CLI Overrides
+    if cli_params:
+        if preset_name:
+            print("[PSS] CLI overrides applied on top of preset")
+        else:
+            print(f"[PSS] Applied CLI overrides: {cli_params}")
+            
+        for key, value in cli_params.items():
+            merged_params[key] = value
+
+    # 4. Final Validation (using PSS1.2 logic)
+    # We re-run merge_params logic but on the already-merged dictionary to enforce types/bounds
+    # This is slightly inefficient but safe. Better: use merge_params to validate the final set.
+    # Actually, merge_params expects raw CLI strings. 
+    # We need a validation pass on the final mixed dictionary.
+    
+    # Let's use a custom validation pass here that reuses safe_convert_type and bounds checks
+    final_params = {}
+    if schema:
+        for key, value in merged_params.items():
+            if key not in schema:
+                if cli_params and key in cli_params:
+                     print(f"[PSS WARNING] Unknown parameter '{key}' ignored")
+                continue
+                
+            spec = schema[key]
+            param_type = spec.get('type', 'str')
+            
+            try:
+                # Ensure value is correct type (it might be raw string from CLI or typed from preset)
+                # If it's already typed (from default or preset), safe_convert_type might fail if it expects string?
+                # safe_convert_type handles strings. If value is already int/float, we should check.
+                
+                if isinstance(value, str):
+                    value = safe_convert_type(value, param_type)
+                
+                # Allowed Values Check
+                if 'allowed' in spec and value not in spec['allowed']:
+                    print(f"[PSS WARNING] Value '{value}' not allowed for '{key}'; using default")
+                    if 'default' in spec:
+                        value = spec['default']
+                    else:
+                        continue # Skip if no default
+                
+                # Bounds Checking
+                if param_type in ('int', 'float'):
+                    if 'min' in spec and value < spec['min']:
+                        print(f"[PSS WARNING] {key}={value} below min={spec['min']}, clamping")
+                        value = spec['min']
+                    if 'max' in spec and value > spec['max']:
+                        print(f"[PSS WARNING] {key}={value} above max={spec['max']}, clamping")
+                        value = spec['max']
+                
+                final_params[key] = value
+                
+            except ValueError:
+                print(f"[PSS WARNING] Invalid type for parameter '{key}'; using default")
+                if 'default' in spec:
+                    final_params[key] = spec['default']
+
+        # Check Required Parameters
+        for key, spec in schema.items():
+            if spec.get('required', False) and key not in final_params:
+                if 'default' in spec:
+                    print(f"[PSS WARNING] Required param '{key}' missing; using default")
+                    final_params[key] = spec['default']
+                else:
+                    print(f"[PSS WARNING] Required param '{key}' missing and no default provided")
+    else:
+        # No schema case
+        if cli_params:
+             print("[PSS WARNING] Scenario does not define SCENARIO_PARAMS; ignoring --params.")
+        if preset_name and presets and preset_name in presets:
+             # Allow presets even without schema (as per user request)
+             final_params = presets[preset_name]
+             print(f"[PSS] Using preset '{preset_name}' (no schema validation)")
+
+    merged_params = final_params
+
+    # PSS Logging Final
+    if merged_params:
+        print(f"[PSS] Final merged parameters: {merged_params}")
+    elif schema and not cli_params and not preset_name:
+         print(f"[PSS] Using schema defaults: {merged_params}")
 
     # Step 3: Build initial state
     print("Initializing universe state...")
@@ -501,6 +613,7 @@ def main(argv: list[str] | None = None) -> int:
         "--params",
         help="Scenario parameters as comma-separated key=value pairs (e.g., N=500,radius=20)"
     )
+    parser.add_argument("--preset", help="Name of a preset configuration to use")
     
     # Physics Parameters
     parser.add_argument("--topology", help="Topology type (flat, torus, etc)")

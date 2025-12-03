@@ -46,6 +46,26 @@ SCENARIO_PARAMS = {
     },
 }
 
+SCENARIO_PRESETS = {
+    "stable_ring": {
+        "N": 64,
+        "radius": 12.0,
+        "speed": 0.8,
+        "mass": 1.0
+    },
+    "wide_ring": {
+        "N": 128,
+        "radius": 20.0,
+        "speed": 0.6
+    },
+    "chaos_ring": {
+        "N": 50,
+        "radius": 5.0,
+        "speed": 1.2,
+        "mass": 0.5
+    }
+}
+
 
 def build_config() -> UniverseConfig:
     """

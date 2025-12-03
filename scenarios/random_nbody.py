@@ -4,6 +4,20 @@ from state import UniverseConfig, initialize_state
 from entities import spawn_entity
 
 
+
+# PSS - Parameterized Scenario System
+SCENARIO_PARAMS = {
+    "N": {"type": "int", "default": 25, "min": 1, "max": 5000},
+    "radius": {"type": "float", "default": 10.0, "min": 1.0, "max": 100.0}
+}
+
+SCENARIO_PRESETS = {
+    "small_cluster": { "N": 200 },
+    "medium_cluster": { "N": 1000 },
+    "large_cluster": { "N": 2500 }
+}
+
+
 def build_config() -> UniverseConfig:
     # Default values from original function
     radius = 10.0
@@ -20,11 +34,17 @@ def build_config() -> UniverseConfig:
     )
 
 
-def build_initial_state(config: UniverseConfig):
+def build_initial_state(config: UniverseConfig, params: dict | None = None) -> UniverseState:
     state = initialize_state(config)
     
-    radius = config.radius
-    n = config.max_entities
+    # Use params if provided, otherwise use config defaults
+    if params:
+        radius = params.get('radius', config.radius)
+        n = params.get('N', config.max_entities)
+    else:
+        radius = config.radius
+        n = config.max_entities
+        
     velocity_scale = 0.3
 
     key = jax.random.PRNGKey(42)
