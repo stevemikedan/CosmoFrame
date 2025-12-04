@@ -173,6 +173,14 @@ def load_scenarios() -> dict[str, str]:
 
             # Don't override manually-specified names
             if short_name not in scenarios:
+                # Check for DEVELOPER_SCENARIO flag
+                try:
+                    mod = importlib.import_module(full_module)
+                    if getattr(mod, "DEVELOPER_SCENARIO", False):
+                        continue
+                except ImportError:
+                    continue
+                    
                 scenarios[short_name] = full_module
 
     return scenarios

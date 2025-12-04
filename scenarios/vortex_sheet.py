@@ -22,6 +22,15 @@ SCENARIO_PRESETS = {
         "dt": 0.0005,
         "viscosity": 0.001,
     },
+    "colliding_streams": {
+        "dt": 0.005,
+        "N": 200,
+    },
+    "shear_layer": {
+        "dt": 0.002,
+        "N": 300,
+        "viscosity": 0.05,
+    },
 }
 
 def build_config(params: dict | None = None) -> UniverseConfig:

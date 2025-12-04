@@ -56,7 +56,7 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
         1
     )
         
-    state.scenario_name = "mobius_walk"
+    state.scenario_name = "toroidal_walk"
     return state
 
 def run(config, state):
