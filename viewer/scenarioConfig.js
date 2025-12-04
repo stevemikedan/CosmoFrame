@@ -5,48 +5,8 @@
  * based on PSS (Parameterized Scenario System) schemas.
  */
 
-// PSS Schema Registry (JS-side only, matches Python SCENARIO_PARAMS)
-export const ScenarioSchemas = {
-    "bulk_ring": {
-        "N": {
-            type: "int",
-            default: 64,
-            min: 1,
-            max: 128,
-            description: "Number of entities in the ring"
-        },
-        "radius": {
-            type: "float",
-            default: 8.0,
-            min: 1.0,
-            max: 50.0,
-            description: "Orbital radius of the ring"
-        },
-        "speed": {
-            type: "float",
-            default: 0.8,
-            min: 0.1,
-            max: 5.0,
-            description: "Tangential velocity"
-        },
-        "mass": {
-            type: "float",
-            default: 1.0,
-            min: 0.1,
-            max: 10.0,
-            description: "Mass per entity"
-        }
-    },
-    "random_nbody": {
-        "N": {
-            type: "int",
-            default: 300,
-            min: 1,
-            max: 5000,
-            description: "Number of random entities"
-        }
-    }
-};
+// Import generated scenario metadata
+import { ScenarioSchemas } from "./generated_scenario_metadata.js";
 
 /**
  * ScenarioConfigUI Class
@@ -54,28 +14,40 @@ export const ScenarioSchemas = {
  * Dynamically generates parameter input forms and CLI commands.
  */
 export class ScenarioConfigUI {
-    constructor(rootElement, schemas) {
+    constructor(rootElement) {
         this.root = rootElement;
-        this.schemas = schemas;
+        this.schemas = ScenarioSchemas;
 
         // DOM References
         this.selector = document.getElementById("scenarioSelector");
+        this.presetSelector = document.getElementById("presetSelector");
         this.paramsContainer = document.getElementById("paramsContainer");
-        this.runBtn = document.getElementById("runScenarioBtn");
+        this.stepsInput = document.getElementById("stepsInput");
+        this.outputDirInput = document.getElementById("outputDirInput");
         this.commandOutput = document.getElementById("scenarioCommandOutput");
         this.commandContainer = document.getElementById("scenarioCommandContainer");
         this.copyBtn = document.getElementById("copyScenarioCommandBtn");
 
         // State
         this.currentParams = {};
+        this.currentScenario = null;
 
         // Initialize
         this.populateScenarios();
 
         // Event Listeners
-        this.selector.onchange = () => this.renderParams();
-        this.runBtn.onclick = () => this.generateCommand();
-        this.copyBtn.onclick = () => this.copyCommand();
+        this.selector.onchange = () => this.onScenarioChange();
+        if (this.presetSelector) {
+            this.presetSelector.onchange = () => this.onPresetChange();
+        }
+
+        // Live command update on any input change
+        this.root.addEventListener("input", () => this.updateCommandPreview());
+        this.root.addEventListener("change", () => this.updateCommandPreview());
+
+        if (this.copyBtn) {
+            this.copyBtn.onclick = () => this.copyCommand();
+        }
     }
 
     /**
@@ -83,6 +55,9 @@ export class ScenarioConfigUI {
      */
     populateScenarios() {
         const names = Object.keys(this.schemas).sort();
+
+        // Clear existing options
+        this.selector.innerHTML = "";
 
         for (const name of names) {
             const opt = document.createElement("option");
@@ -93,23 +68,84 @@ export class ScenarioConfigUI {
 
         if (names.length > 0) {
             this.selector.value = names[0];
-            this.renderParams();
+            this.onScenarioChange();
         }
+    }
+
+    /**
+     * Handle scenario selection change
+     */
+    onScenarioChange() {
+        this.currentScenario = this.selector.value;
+        this.populatePresets();
+        this.renderParams();
+        this.updateCommandPreview();
+    }
+
+    /**
+     * Populate preset dropdown for selected scenario
+     */
+    populatePresets() {
+        if (!this.presetSelector) return;
+
+        const scenario = this.schemas[this.currentScenario];
+        const presets = scenario?.presets || {};
+        const presetNames = Object.keys(presets);
+
+        // Clear and add "None" option
+        this.presetSelector.innerHTML = "";
+
+        const noneOpt = document.createElement("option");
+        noneOpt.value = "";
+        noneOpt.textContent = "(None)";
+        this.presetSelector.appendChild(noneOpt);
+
+        for (const name of presetNames) {
+            const opt = document.createElement("option");
+            opt.value = name;
+            opt.textContent = name;
+            this.presetSelector.appendChild(opt);
+        }
+    }
+
+    /**
+     * Handle preset selection - autofill parameter fields
+     */
+    onPresetChange() {
+        const presetName = this.presetSelector.value;
+        if (!presetName) return;
+
+        const scenario = this.schemas[this.currentScenario];
+        const presetValues = scenario?.presets?.[presetName] || {};
+
+        // Apply preset values to form fields
+        for (const [key, value] of Object.entries(presetValues)) {
+            const input = this.paramsContainer.querySelector(`[data-param="${key}"]`);
+            if (input) {
+                if (input.type === "checkbox") {
+                    input.checked = !!value;
+                } else {
+                    input.value = value;
+                }
+                this.currentParams[key] = value;
+            }
+        }
+
+        this.updateCommandPreview();
     }
 
     /**
      * Render parameter input fields for selected scenario
      */
     renderParams() {
-        const scenario = this.selector.value;
-        const schema = this.schemas[scenario] || null;
+        const scenario = this.schemas[this.currentScenario];
+        const params = scenario?.params || {};
 
         // Clear previous
         this.paramsContainer.innerHTML = "";
         this.currentParams = {};
-        this.commandContainer.style.display = "none";
 
-        if (!schema) {
+        if (Object.keys(params).length === 0) {
             const msg = document.createElement("div");
             msg.textContent = "No editable parameters for this scenario.";
             msg.style.color = "#aaa";
@@ -120,12 +156,12 @@ export class ScenarioConfigUI {
         }
 
         // Generate input fields
-        for (const [key, spec] of Object.entries(schema)) {
+        for (const [key, spec] of Object.entries(params)) {
             const wrapper = document.createElement("div");
             wrapper.style.marginBottom = "12px";
 
             const label = document.createElement("label");
-            label.textContent = `${key}`;
+            label.textContent = key;
             label.style.display = "block";
             label.style.marginBottom = "4px";
             label.style.fontSize = "13px";
@@ -150,7 +186,35 @@ export class ScenarioConfigUI {
                 input.type = "checkbox";
                 input.checked = !!spec.default;
                 input.style.transform = "scale(1.2)";
+            } else if (spec.allowed && Array.isArray(spec.allowed)) {
+                // Dropdown for allowed values
+                input = document.createElement("select");
+                input.style.width = "100%";
+                input.style.padding = "6px";
+                input.style.borderRadius = "4px";
+                input.style.border = "1px solid #555";
+                input.style.background = "#222";
+                input.style.color = "#fff";
+
+                for (const val of spec.allowed) {
+                    const opt = document.createElement("option");
+                    opt.value = val;
+                    opt.textContent = val;
+                    if (val === spec.default) opt.selected = true;
+                    input.appendChild(opt);
+                }
+            } else if (spec.type === "str") {
+                input = document.createElement("input");
+                input.type = "text";
+                input.value = spec.default || "";
+                input.style.width = "100%";
+                input.style.padding = "6px";
+                input.style.borderRadius = "4px";
+                input.style.border = "1px solid #555";
+                input.style.background = "#222";
+                input.style.color = "#fff";
             } else {
+                // Numeric input (int or float)
                 input = document.createElement("input");
                 input.type = "number";
                 input.value = spec.default;
@@ -163,6 +227,8 @@ export class ScenarioConfigUI {
 
                 if (spec.type === "int") {
                     input.step = "1";
+                } else {
+                    input.step = "any";
                 }
                 if (spec.min !== undefined) {
                     input.min = spec.min;
@@ -172,9 +238,17 @@ export class ScenarioConfigUI {
                 }
             }
 
+            // Data attribute for lookup
+            input.dataset.param = key;
+
             // Update handler
             input.onchange = () => {
                 this.currentParams[key] = this.readParamValue(spec, input);
+                this.updateCommandPreview();
+            };
+            input.oninput = () => {
+                this.currentParams[key] = this.readParamValue(spec, input);
+                this.updateCommandPreview();
             };
 
             // Initialize current params
@@ -200,31 +274,53 @@ export class ScenarioConfigUI {
     }
 
     /**
-     * Generate CLI command with current parameters
+     * Update CLI command preview (live)
      */
-    generateCommand() {
-        const scenario = this.selector.value;
-        const pieces = [];
+    updateCommandPreview() {
+        const scenario = this.currentScenario;
+        const preset = this.presetSelector?.value || "";
+        const steps = this.stepsInput?.value || 300;
+        const outputDir = this.outputDirInput?.value || "outputs/demo";
 
+        // Build params string
+        const pieces = [];
         for (const [key, value] of Object.entries(this.currentParams)) {
             pieces.push(`${key}=${value}`);
         }
-
         const paramStr = pieces.join(",");
-        const cmd = `python cosmosim.py --scenario ${scenario} --params "${paramStr}" --steps 500 --view web`;
 
-        this.commandOutput.value = cmd;
-        this.commandContainer.style.display = "block";
+        // Build command
+        let cmd = `python cosmosim.py --scenario ${scenario}`;
+
+        if (preset) {
+            cmd += ` --preset ${preset}`;
+        }
+
+        if (paramStr) {
+            cmd += ` --params "${paramStr}"`;
+        }
+
+        cmd += ` --steps ${steps}`;
+        cmd += ` --view web`;
+        cmd += ` --output-dir ${outputDir}`;
+
+        if (this.commandOutput) {
+            this.commandOutput.value = cmd;
+        }
+        if (this.commandContainer) {
+            this.commandContainer.style.display = "block";
+        }
     }
 
     /**
      * Copy command to clipboard
      */
     copyCommand() {
-        this.commandOutput.select();
-        this.commandOutput.setSelectionRange(0, 99999); // For mobile
+        if (!this.commandOutput) return;
 
-        // Modern clipboard API
+        this.commandOutput.select();
+        this.commandOutput.setSelectionRange(0, 99999);
+
         if (navigator.clipboard) {
             navigator.clipboard.writeText(this.commandOutput.value)
                 .then(() => {
@@ -234,12 +330,13 @@ export class ScenarioConfigUI {
                     }, 2000);
                 })
                 .catch(() => {
-                    // Fallback to document.execCommand
                     document.execCommand("copy");
                 });
         } else {
-            // Fallback for older browsers
             document.execCommand("copy");
         }
     }
 }
+
+// Re-export for backward compatibility
+export { ScenarioSchemas };

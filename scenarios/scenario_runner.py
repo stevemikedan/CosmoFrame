@@ -4,6 +4,8 @@ from state import UniverseConfig, initialize_state
 from entities import spawn_entity
 from kernel import step_simulation
 
+DEVELOPER_SCENARIO = True
+
 
 def binary_star_system():
     """Two equal-mass stars orbiting each other."""

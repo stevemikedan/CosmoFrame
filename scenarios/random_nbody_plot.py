@@ -7,6 +7,8 @@ import jax.numpy as jnp
 from kernel import step_simulation
 import jax
 
+DEVELOPER_SCENARIO = True
+
 def run_plot(config, state):
     """
     Original random_nbody run with internal simulation and plotting.
