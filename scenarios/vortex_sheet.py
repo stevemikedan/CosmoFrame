@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 from state import UniverseConfig, UniverseState, initialize_state
 from entities import spawn_entity
+from kernel import step_simulation
 
 SCENARIO_PARAMS = {
     "N": {"type": "int", "default": 100, "min": 10, "max": 5000},
@@ -90,5 +91,8 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
     state.scenario_name = "vortex_sheet"
     return state
 
-def run(config, state):
+def run(config, state, steps=300):
+    """Run vortex sheet simulation with dynamics."""
+    for _ in range(steps):
+        state = step_simulation(state, config)
     return state

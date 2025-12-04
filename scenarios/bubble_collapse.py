@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 from state import UniverseConfig, UniverseState, initialize_state
 from entities import spawn_entity
+from kernel import step_simulation
 
 SCENARIO_PARAMS = {
     "N": {"type": "int", "default": 100, "min": 10, "max": 5000},
@@ -79,7 +80,7 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
     k1, k2 = jax.random.split(key, 2)
     
     # Create a spherical shell
-    # For 2D, this is a circle. For 3D, a sphere. Assuming 2D for now based on other scenarios.
+    # For 2D, this is a circle. For 3D, a sphere.
     if config.dim == 3:
         # Uniform distribution on sphere
         z = jax.random.uniform(k1, (n,), minval=-1.0, maxval=1.0)
@@ -90,7 +91,6 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
         y = r_xy * jnp.sin(theta)
         
         # Add radial noise/asymmetry
-        # For 3D, we apply noise to the radius vector magnitude
         base_pos = jnp.stack([x, y, z], axis=1)
         r_noise = jax.random.normal(k2, (n, 1)) * asymmetry * 0.2
         positions = base_pos * (radius * (1.0 + r_noise))
@@ -111,5 +111,8 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
     state.scenario_name = "bubble_collapse"
     return state
 
-def run(config, state):
+def run(config, state, steps=300):
+    """Run bubble collapse simulation with gravitational dynamics."""
+    for _ in range(steps):
+        state = step_simulation(state, config)
     return state

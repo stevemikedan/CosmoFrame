@@ -2,6 +2,7 @@ import jax
 
 from state import UniverseConfig, UniverseState, initialize_state
 from entities import spawn_entity
+from kernel import step_simulation
 
 # PSS - Parameterized Scenario System
 SCENARIO_PARAMS = {
@@ -44,16 +45,15 @@ def build_config(params: dict | None = None) -> UniverseConfig:
     Args:
         params: Optional parameter dict from CLI/PSS
     """
-    # Extract params with defaults
     p = params or {}
     radius = p.get('radius', 10.0)
-    n = p.get('max_entities', p.get('N', 25))  # Support both names
+    n = p.get('max_entities', p.get('N', 25))
     dt = p.get('dt', 0.2)
     G = p.get('G', 5.0)
     c = p.get('c', 1.0)
     topology_type = p.get('topology_type', 0)
     physics_mode = p.get('physics_mode', 0)
-    dim = p.get('dim', 3)  # Default to 3D for random n-body
+    dim = p.get('dim', 3)
     
     return UniverseConfig(
         topology_type=topology_type,
@@ -70,7 +70,6 @@ def build_config(params: dict | None = None) -> UniverseConfig:
 def build_initial_state(config: UniverseConfig, params: dict | None = None) -> UniverseState:
     state = initialize_state(config)
     
-    # Use params if provided, otherwise use config defaults
     if params:
         radius = params.get('radius', config.radius)
         n = params.get('N', config.max_entities)
@@ -78,16 +77,15 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
         radius = config.radius
         n = config.max_entities
         
-    velocity_scale = 0.01  # Very small initial velocities so gravity dominates
+    velocity_scale = 0.01
 
     key = jax.random.PRNGKey(42)
     k1, k2, k3 = jax.random.split(key, 3)
 
-    positions = jax.random.normal(k1, (n, config.dim)) * (radius * 0.1)  # Tighter cluster
+    positions = jax.random.normal(k1, (n, config.dim)) * (radius * 0.1)
     velocities = jax.random.normal(k2, (n, config.dim)) * velocity_scale
     masses = jax.random.uniform(k3, (n,)) * 1.5 + 0.3
 
-    # Spawn all bodies
     for i in range(n):
         state = spawn_entity(
             state,
@@ -100,12 +98,10 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
     return state
 
 
-def run(config, state):
-    """
-    JSON-export-compatible random_nbody run.
-    DO NOT run simulation physics here.
-    The global export_simulation() loop will drive the updates.
-    """
+def run(config, state, steps=300):
+    """Run random N-body simulation with gravitational dynamics."""
+    for _ in range(steps):
+        state = step_simulation(state, config)
     return state
 
 

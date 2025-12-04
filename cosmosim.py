@@ -600,14 +600,11 @@ def run_scenario(module: Any, args: argparse.Namespace, scenario_name: str) -> N
     if view_mode == "auto":
         if args.interactive:
             view_mode = "debug"
-        elif args.export_json:
-            view_mode = "web"
         else:
             view_mode = "none"
     
     # Handle legacy flags mapping to view modes
     if args.interactive and view_mode == "auto": view_mode = "debug"
-    if args.export_json and view_mode == "auto": view_mode = "web"
 
     # Print Banner
     print_banner(args, scenario_name)
@@ -647,27 +644,7 @@ def run_scenario(module: Any, args: argparse.Namespace, scenario_name: str) -> N
         return
 
     if view_mode == "web":
-        # Enforce export
-        # Enforce export
-        steps_value = args.steps if args.steps is not None else getattr(cfg, "steps", 300)
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-        export_dir_name = f"{scenario_name}_{steps_value}_steps_{timestamp}"
-        # Respect --output-dir if provided
-        base_output = pathlib.Path(args.output_dir) if args.output_dir else pathlib.Path("outputs")
-        full_export_dir = base_output / "frames" / export_dir_name
-        full_export_dir.mkdir(parents=True, exist_ok=True)
-        
-        os.environ["COSMOSIM_EXPORT_JSON_DIR"] = str(full_export_dir.resolve())
-
-        # Only export frames if user did NOT request single JSON export
-        if not args.export_json:
-            print("[WEB] Exporting frames for web viewer...")
-            full_export_dir.mkdir(parents=True, exist_ok=True)
-            export_simulation(cfg, state, steps=steps_value, output_dir=str(full_export_dir))
-
-        print("[WEB] Launching web viewer...")
-        launch_web_viewer(str(full_export_dir))
-        return
+        print("[INFO] Web view enabled. JSON output prepared for external viewer.")
 
     # -----------------------------------------------------------------
     # ROUTING: HEADLESS / NONE
@@ -750,7 +727,8 @@ def main(argv: list[str] | None = None) -> int:
         help="Viewer mode: 'debug' (interactive), 'web' (export for browser), 'none' (headless)"
     )
     parser.add_argument("--interactive", "-i", action="store_true", help="Alias for --view debug")
-    parser.add_argument("--export-json", action="store_true", help="Alias for --view web")
+    parser.add_argument("--export-json", action="store_true", help="Export simulation as single JSON file")
+    parser.add_argument("--export-frames", action="store_true", help="Export simulation as per-step frame files")
     
     parser.add_argument("--headless", action="store_true", help="Force headless mode (deprecated, use --view none)")
     parser.add_argument("--output-dir", "-o", help="Override output directory")

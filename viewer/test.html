@@ -211,7 +211,16 @@
         <label>Scenario:</label>
         <select id="scenarioSelector" style="width:100%; margin-bottom:10px;"></select>
 
+        <label>Preset:</label>
+        <select id="presetSelector" style="width:100%; margin-bottom:10px;"></select>
+
         <div id="paramsContainer"></div>
+
+        <label>Steps:</label>
+        <input type="number" id="stepsInput" value="300" min="1" style="width:100%; margin-bottom:10px;">
+
+        <label>Output Directory:</label>
+        <input type="text" id="outputDirInput" value="outputs/demo" style="width:100%; margin-bottom:10px;">
 
         <button id="runScenarioBtn" style="width:100%; margin-top:10px;">
             Generate Simulation Command
@@ -608,8 +617,8 @@
                 // Auto-camera adjustment
                 if (config.autoCamera) {
                     const frame = player.frames[player.currentFrame];
-                    if (frame && frame.positionsitions) {
-                        updateCameraView(camera, frame.positionsitions, config);
+                    if (frame && frame.positions) {
+                        updateCameraView(camera, frame.positions, config);
                     }
                 }
             }
