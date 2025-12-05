@@ -26,7 +26,14 @@ class UniverseConfig:
     bounds: float | None = None  # None means infinite flat space
     # Physics stabilization
     gravity_softening: float = 0.05  # Softening length to prevent singularities
-    integrator: str = "euler"  # "euler" (semi-implicit) or "leapfrog" (velocity Verlet)
+    integrator: str = "velocity_verlet"  # Default to stable integrator
+    
+    # Safety Controls (PS2.4)
+    max_accel: float = 1e5
+    max_vel: float = 1e4
+    max_step_growth: float = 1.05
+    radius_max: float = 1e12
+    
     enable_diagnostics: bool = True  # Compute energy/momentum diagnostics
     # Adaptive timestep parameters
     enable_adaptive_dt: bool = True  # Enable adaptive timestep
@@ -78,6 +85,16 @@ class UniverseState:
     node_pos: jnp.ndarray       # shape (max_nodes, 2)
     edge_active: jnp.ndarray    # shape (max_nodes, max_nodes)
     edge_indices: jnp.ndarray   # shape (max_nodes, max_nodes, 2)
+    
+    # Diagnostics (PS2.4) - initialized in initialize_state
+    kinetic_energy: jnp.ndarray
+    potential_energy: jnp.ndarray
+    total_energy: jnp.ndarray
+    energy_drift: jnp.ndarray
+    momentum: jnp.ndarray
+    center_of_mass: jnp.ndarray
+    dt_actual: jnp.ndarray
+    wrap_count: jnp.ndarray
 
     # Optional topology fields – placed at the end to keep .replace() compatibility
     topology_type: int = 0
@@ -111,6 +128,16 @@ def initialize_state(config: UniverseConfig) -> UniverseState:
         node_pos=jnp.zeros((config.max_nodes, 2)),
         edge_active=jnp.zeros((config.max_nodes, config.max_nodes), dtype=bool),
         edge_indices=jnp.zeros((config.max_nodes, config.max_nodes, 2), dtype=jnp.int32),
+
+        # Diagnostics
+        kinetic_energy=jnp.array(0.0),
+        potential_energy=jnp.array(0.0),
+        total_energy=jnp.array(0.0),
+        energy_drift=jnp.array(0.0),
+        momentum=jnp.zeros(config.dim),
+        center_of_mass=jnp.zeros(config.dim),
+        dt_actual=jnp.array(config.dt),
+        wrap_count=jnp.array(0),
 
         # Topology fields
         topology_type=config.topology_type,
