@@ -106,8 +106,23 @@ def compute_diagnostics(state: UniverseState, config: UniverseConfig) -> Univers
         dt_actual=jnp.array(config.dt)
     )
 
+def validate_topology_parameters(config):
+    if config.topology_type == 1:  # torus
+        if config.torus_size is None or config.torus_size <= 0:
+            raise ValueError("Invalid torus_size: must be > 0.")
+    if config.topology_type == 2:  # sphere
+        if config.radius is None or config.radius <= 0:
+            raise ValueError("Invalid sphere radius: must be > 0.")
+    if config.topology_type == 3:  # bubble
+        if config.bubble_radius is None or config.bubble_radius <= 0:
+            raise ValueError("Invalid bubble_radius: must be > 0.")
+
 def step_simulation(state: UniverseState, config: UniverseConfig) -> UniverseState:
     """Execute one simulation timestep."""
+    # Validation checks (runs once during JIT tracing, or every step if eager)
+    validate_topology_parameters(config)
+
+
     # 1. Update global time
     state = state.replace(time=state.time + config.dt)
 
