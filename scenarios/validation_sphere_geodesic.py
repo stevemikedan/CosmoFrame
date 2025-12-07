@@ -7,7 +7,7 @@ Developer scenario for PS2.4 validation.
 import jax.numpy as jnp
 from state import UniverseConfig, UniverseState, initialize_state
 from entities import spawn_entity
-from kernel import step_simulation
+from kernel import step_simulation, compute_diagnostics
 
 DEVELOPER_SCENARIO = True
 
@@ -86,6 +86,11 @@ def run(config, state, steps=300):
     """Run sphere geodesic test."""
     print(f"[SPHERE_GEO] Sphere radius: {config.radius}")
     print(f"[SPHERE_GEO] {config.max_entities} particles on sphere surface")
+    
+    # Compute diagnostics for initial state
+    if config.enable_diagnostics:
+        state = compute_diagnostics(state, config)
+        
     print(f"[SPHERE_GEO] Initial E = {float(state.total_energy):.6f}")
     
     for i in range(steps):

@@ -8,7 +8,8 @@ import jax
 import jax.numpy as jnp
 from state import UniverseConfig, UniverseState, initialize_state
 from entities import spawn_entity
-from kernel import step_simulation
+from entities import spawn_entity
+from kernel import step_simulation, compute_diagnostics
 
 DEVELOPER_SCENARIO = True
 
@@ -65,6 +66,10 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
 def run(config, state, steps=300):
     """Run with detailed diagnostics output."""
     
+    # Compute diagnostics for initial state
+    if config.enable_diagnostics:
+        state = compute_diagnostics(state, config)
+        
     # Store initial energy for drift calculation
     initial_E = float(state.total_energy)
     

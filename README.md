@@ -1,285 +1,138 @@
-CosmoSim
-A Polymorphic, Differentiable, JAX-Accelerated Universe Simulation Engine
+# CosmoSim
+**A Polymorphic, Differentiable, JAX-Accelerated Universe Simulation Engine**
 
-Sprints 0–6.6 Complete • Physics & Visualization Stable • Ready for Sprint 7
+🌌 **Overview**
 
-🌌 Overview
+CosmoSim is an extensible cosmological simulation engine built using a JAX-powered ECS architecture. It enables research, experimentation, and comparison of cosmological models across:
 
-CosmoSim is an extensible cosmological simulation engine built using a JAX-powered ECS architecture.
-It enables research, experimentation, and comparison of cosmological models across:
+*   **Continuous vector physics** (N-body gravity)
+*   **Multiple topologies** (Flat, 3-Torus, Mobius Strip, Sphere)
+*   **Differentiable physics** and metrics for AI-driven optimization
 
-Continuous vector physics (N-body gravity)
+CosmoSim is designed for developers, researchers, and agentic AI workflows.
 
-Discrete lattice / voxel worlds (future Sprints)
+---
 
-Multiple topologies (Flat, Spherical, Toroidal, future Organic Manifolds)
+## 🚀 Running the App
 
-Differentiable physics and metrics for AI-driven optimization
+The unified entry point for all simulations is `cosmosim.py`.
 
-CosmoSim is designed for developers, researchers, and agentic AI workflows (e.g., Google Antigravity).
-
-🧠 Core Scientific Ideas
-1. Differentiable Universe State (PyTree ECS)
-
-All state is contained within a JAX PyTree — enabling:
-
-JIT-accelerated physics
-
-Differentiable updates
-
-Vectorized operations
-
-Static memory layout (required by JAX)
-
-2. Polymorphic Topologies
-
-CosmoSim cleanly separates Metric Space from Physics Rules.
-
-The engine never assumes Euclidean space.
-
-Supported so far:
-
-Flat (Euclidean)
-
-Sphere (Riemannian)
-
-Torus (toroidal wrap-around)
-
-Planned:
-
-Hyperbolic spaces
-
-Organic tetrahedral manifold
-
-Arbitrary user-defined geometries
-
-3. Physics Router
-
-A strategy layer dynamically dispatches physics kernels:
-
-VECTOR mode
-
-LATTICE mode
-
-VOXEL / FIELD (reserved)
-
-CUSTOM (future)
-
-🏗️ High-Level Architecture
-                      ┌─────────────────────────────────────┐
-                      │             UniverseConfig           │
-                      │ (topology, physics_mode, constants)  │
-                      └─────────────────────────────────────┘
-                                     │
-                                     ▼
-       ┌────────────────────────────────────────────────────────────┐
-       │                      UniverseState (PyTree)                 │
-       │-------------------------------------------------------------│
-       │  time, radius, curvature_k, dt                               │
-       │                                                             │
-       │  entity_active[N]                                           │
-       │  entity_pos[N,2]                                            │
-       │  entity_vel[N,2]                                            │
-       │  entity_mass[N]                                             │
-       │                                                             │
-       │  lattice buffers (preallocated, optional)                   │
-       │                                                             │
-       │  All fields JAX arrays → stable static shapes               │
-       └────────────────────────────────────────────────────────────┘
-                                     │
-                                     ▼
-               ┌──────────────────────────────────────┐
-               │            Physics Router             │
-               │   dispatch_physics(state,cfg)         │
-               └──────────────────────────────────────┘
-                      │                │
-     ┌────────────────┘                └────────────────┐
-     ▼                                                 ▼
-┌───────────────┐                            ┌────────────────┐
-│ update_vector │                            │ update_lattice │
-│  (N-body)     │                            │   (placeholder)│
-└───────────────┘                            └────────────────┘
-       │                                                 
-       ▼                                                 
-┌──────────────────────────────────────────────────────────┐
-│         Metric Layer (compute_distance, boundaries)       │
-└──────────────────────────────────────────────────────────┘
-
-
-📂 Project Structure
-CosmoSim/
-│
-├── state.py
-├── kernel.py
-├── topology.py
-├── entities.py
-│
-├── run_sim.py
-├── jit_run_sim.py
-│
-├── trajectory_plot.py
-├── snapshot_plot.py
-├── energy_plot.py
-├── visualize.py
-│
-├── test_architecture.py
-├── test_visualization.py
-│
-├── outputs/
-│   ├── trajectories/
-│   ├── snapshots/
-│   ├── energy/
-│   └── animations/
-│
-├── tools/
-│   ├── clean_outputs.py
-│   └── run_all_visualizations.py
-│
-├── task.md
-└── README.md
-
-🧪 Running Tests
-
-Run entire suite:
-
-pytest -q
-
-
-Or run engine-only tests:
-
-python test_architecture.py
-
-
-Visualization tests:
-
-python test_visualization.py
-
-🎨 Visualization Tools
-Trajectory Plot
-python trajectory_plot.py
-
-
-Outputs to: outputs/trajectories/
-
-Snapshot Plot
-python snapshot_plot.py
-
-
-Outputs to: outputs/snapshots/
-
-Energy Diagnostics
-python energy_plot.py
-
-
-Outputs to: outputs/energy/
-
-Real-Time Animation (saved frame)
-python visualize.py
-
-
-Outputs to: outputs/animations/
-
-Or run all:
-python tools/run_all_visualizations.py
-
-🚀 Running the app
-
-The following steps show how to run CosmoSim from the terminal (PowerShell).
+### 1. Installation
 
 ```powershell
-# Create a virtual environment
+# Create virtual environment
 python -m venv .venv
-
-# Activate the environment
 .\.venv\Scripts\Activate.ps1
 
-# Install required packages (no requirements.txt in this repo)
+# Install dependencies
 pip install jax matplotlib pytest
-
-# Run a scenario (e.g., bulk_ring) with a debug view
-python cosmosim.py --scenario bulk_ring --view debug
 ```
 
-🔧 Installation
+### 2. Run a Simulation
 
-Create a virtual environment:
+**Command syntax:**
+```powershell
+python cosmosim.py --scenario <SCENARIO_NAME> [OPTIONS]
+```
 
-python -m venv .venv
+**Common Examples:**
 
+```powershell
+# Run a specific scenario with interactive debug view
+python cosmosim.py --scenario bulk_ring --view debug
 
-Activate:
+# Run a validation scenario headless (fast)
+python cosmosim.py --scenario validation_2body_orbit --steps 200
 
-PowerShell:
+# Run with custom parameters (Scenario PSS)
+python cosmosim.py --scenario random_nbody --params "N=500,radius=50.0" --view debug
+```
 
-.\.venv\Scripts\Activate.ps1
+**Key Flags:**
+*   `--scenario`: Name of the scenario module (e.g., `random_nbody`, `bulk_ring`).
+*   `--view`:
+    *   `debug`: Opens the Matplotlib-based interactive viewer.
+    *   `web`: Runs headless and prepares JSON output for the Web Viewer.
+    *   `none`: Headless mode (fastest).
+*   `--steps`: Number of simulation steps to run.
+*   `--export-json`: Exports the simulation data to a JSON file.
 
+---
 
-Install dependencies:
+## 🎨 Visualization
 
-pip install jax matplotlib pytest
+CosmoSim offers two primary ways to visualize simulations:
 
+### 1. Interactive Debugger (Matplotlib)
+Best for quick validation and real-time interaction during development.
 
-Or minimal required:
+```powershell
+python cosmosim.py --scenario random_nbody --view debug
+```
+*   **Controls**: Mouse to pan/zoom. Window closes automatically at end of steps unless interactive mode is held.
 
-pip install jax matplotlib pytest
+### 2. Web Viewer (Three.js)
+High-fidelity, cinematic visualization with topology overlays and smooth 60fps playback.
 
-🚀 Completed Sprints (0–6.6)
-Sprint	Description	Status
-0	Project skeleton + directory structure	✅
-1	UniverseState + ECS memory model	✅
-2	Metric Layer (topology & distance)	✅
-3	Physics Router (lax.cond)	✅
-4	Boundaries integrated	✅
-5	Real vector physics (N-body gravity)	✅
-6	Snapshot + Energy + Animation visualizers	✅
-6.6	Unified visualization architecture	✅
-🧭 Upcoming Roadmap
-🚧 Sprint 7 — Physics Stabilization
+**Workflow:**
+1.  **Generate Data**: Run a simulation and export to JSON.
+    ```powershell
+    python cosmosim.py --scenario bulk_ring --steps 500 --export-json
+    ```
+    *Output will be saved to `outputs/bulk_ring_500_steps_<timestamp>.json`*
 
-Add gravitational softening parameter (ε²)
+2.  **Start Local Server**:
+    ```powershell
+    python -m http.server 8000
+    ```
 
-Add energy drift tolerance tests
+3.  **Open Viewer**:
+    *   Navigate to: [http://localhost:8000/viewer/test.html](http://localhost:8000/viewer/test.html)
+    *   Click **"Load .json Simulation"**
+    *   Select the generated JSON file from the `outputs/` directory.
 
-Improve numerical integrators:
+---
 
-Leapfrog
+## 🧠 Core Features
 
-Verlet
+### 1. Differentiable Universe State (PyTree ECS)
+All state is contained within a JAX PyTree, enabling JIT-accelerated physics, differentiable updates, and vectorized operations on static memory layouts.
 
-RK2 or RK4
+### 2. Polymorphic Topologies
+The engine separates Metric Space from Physics Rules.
+*   **Supported**: Flat (Euclidean), Torus (periodic), Sphere (Riemannian), Mobius.
+*   **Planned**: Hyperbolic spaces, Organic manifolds.
 
-Long-run stability diagnostics
+### 3. Physics Router
+A strategy layer dynamically dispatches physics kernels based on the configuration.
 
-Regression trajectories
+---
 
-🚧 Sprint 8 — Topological Expansion
+## 📂 Project Structure
 
-Organic tetrahedral manifold
+```text
+CosmoSim/
+├── cosmosim.py             # Main CLI entry point
+├── kernel.py               # Core physics step & integrator
+├── state.py                # UniverseState data structure
+├── topology.py             # Metric & topology definitions
+│
+├── scenarios/              # Simulation scenarios (bulk_ring, random_nbody, etc.)
+├── topologies/             # Topology implementations
+├── viewer/                 # Web Viewer (Three.js) & Interactive Debugger source
+│
+├── outputs/                # Simulation artifacts (JSON exports, plots)
+│
+├── tests/                  # Test suite
+└── docs/                   # Documentation
+```
 
-Hyperbolic models
+## 🧪 Running Tests
 
-Advanced coordinate transforms
+```powershell
+# Run entire test suite
+pytest
 
-Non-Euclidean light cones
-
-🚧 Sprint 9 — Configurable Simulation Loader
-
-JSON/DSL-based universe definitions
-
-User-defined physics modules
-
-🚧 Sprint 10 — GUI / Web Viewer
-
-Interactive 2D/3D visualization
-
-Simulation controls and live tweaking
-
-🤝 Contributing
-
-Even if this is currently a single-developer repo, this section future-proofs the project:
-
-All code must pass both test suites
-
-Engine modules should not be modified outside their designated sprint
-
-It’s designed to grow with your vision — including your long-term cosmological and philosophical frameworks.
+# Run fast tests only
+pytest -q
+```

@@ -7,7 +7,7 @@ Developer scenario for PS2.4 validation.
 import jax.numpy as jnp
 from state import UniverseConfig, UniverseState, initialize_state
 from entities import spawn_entity
-from kernel import step_simulation
+from kernel import step_simulation, compute_diagnostics
 
 DEVELOPER_SCENARIO = True
 
@@ -64,6 +64,11 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
 
 def run(config, state, steps=300):
     """Run 2-body orbit with diagnostics monitoring."""
+    
+    # Compute diagnostics for initial state
+    if config.enable_diagnostics:
+        state = compute_diagnostics(state, config)
+        
     print(f"[2BODY_ORBIT] Initial E = {float(state.total_energy):.6f}")
     
     for i in range(steps):
