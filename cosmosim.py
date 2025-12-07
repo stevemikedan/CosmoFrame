@@ -98,8 +98,8 @@ CORE_PHYSICS_PARAMS = {
     "topology_type": {
         "type": "int",
         "default": 0,
-        "allowed": [0, 1, MobiusTopology.MOBIUS_TOPOLOGY],
-        "description": "Topology: 0=flat, 1=toroidal, 5=mobius"
+        "allowed": [0, 1, 2, MobiusTopology.MOBIUS_TOPOLOGY],
+        "description": "Topology: 0=flat, 1=toroidal, 2=spherical, 5=mobius"
     },
     "physics_mode": {
         "type": "int",
@@ -550,21 +550,19 @@ def run_scenario(module: Any, args: argparse.Namespace, scenario_name: str) -> N
 
     merged_params = final_params
 
+    # Ensure scenario-defined topology_type overrides schema defaults
+    if hasattr(module, 'DEFAULT_TOPOLOGY_TYPE'):
+        merged_params['topology_type'] = module.DEFAULT_TOPOLOGY_TYPE
+
     # PSS Logging Final
     if merged_params:
         print(f"[PSS] Final merged parameters: {merged_params}")
     elif full_schema and not cli_params and not preset_name:
          print(f"[PSS] Using schema defaults")
 
-    # Step 2: Build configuration with params
+    # Step 2: Build configuration with params (ALWAYS pass merged_params)
     print(f"Building configuration for '{scenario_name}'...")
-    
-    # Check if build_config accepts params
-    sig = inspect.signature(module.build_config)
-    if 'params' in sig.parameters:
-        cfg = module.build_config(merged_params if merged_params else None)
-    else:
-        cfg = module.build_config()
+    cfg = module.build_config(merged_params)
 
     # Config dump
     if args.config_dump:

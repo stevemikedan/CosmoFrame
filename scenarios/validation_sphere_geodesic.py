@@ -10,6 +10,7 @@ from entities import spawn_entity
 from kernel import step_simulation, compute_diagnostics
 
 DEVELOPER_SCENARIO = True
+DEFAULT_TOPOLOGY_TYPE = 2  # Sphere topology
 
 SCENARIO_PARAMS = {
     "radius": {"type": "float", "default": 10.0, "min": 5.0, "max": 50.0},
