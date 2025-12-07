@@ -98,8 +98,8 @@ CORE_PHYSICS_PARAMS = {
     "topology_type": {
         "type": "int",
         "default": 0,
-        "allowed": [0, 1, MobiusTopology.MOBIUS_TOPOLOGY],
-        "description": "Topology: 0=flat, 1=toroidal, 5=mobius"
+        "allowed": [0, 1, 2, MobiusTopology.MOBIUS_TOPOLOGY],
+        "description": "Topology: 0=flat, 1=toroidal, 2=spherical, 5=mobius"
     },
     "physics_mode": {
         "type": "int",
@@ -131,58 +131,45 @@ CORE_PHYSICS_PARAMS = {
 
 
 
-def load_scenarios() -> dict[str, str]:
+def load_scenarios():
     """
-    Discover all available scenarios.
+    Auto-discover available scenario modules.
 
     Returns:
-        Dictionary mapping short scenario names to full module paths.
+        dict: mapping of short_name -> module_path
     """
-    # Manually seed short names for backward compatibility
-    scenarios = {
-        "visualize": "plotting.visualize",
-        "snapshot_plot": "plotting.snapshot_plot",
-        "trajectory_plot": "plotting.trajectory_plot",
-        "energy_plot": "plotting.energy_plot",
-    }
+    import pathlib
 
-    # Add other root-level modules
-    root_modules = [
-        "run_sim",
-        "jit_run_sim",
-    ]
+    scenarios = {}
 
-    for name in root_modules:
-        scenarios[name] = name
+    # --------------------------------------------------------
+    # 1. Add plotting modules with short names
+    # --------------------------------------------------------
+    # Added trajectory_plot to ensure all expected modules are present
+    plotting_modules = ["visualize", "snapshot_plot", "energy_plot", "trajectory_plot"]
+    for name in plotting_modules:
+        scenarios[name] = f"plotting.{name}"
 
-    # Also add full plotting.* paths for discovery
-    scenarios["plotting.visualize"] = "plotting.visualize"
-    scenarios["plotting.snapshot_plot"] = "plotting.snapshot_plot"
-    scenarios["plotting.trajectory_plot"] = "plotting.trajectory_plot"
-    scenarios["plotting.energy_plot"] = "plotting.energy_plot"
-
-    # Auto-discover scenarios in scenarios/ package
-    base_dir = pathlib.Path(os.getcwd())
+    # --------------------------------------------------------
+    # 2. Discover modules in the scenarios/ directory
+    # --------------------------------------------------------
+    base_dir = pathlib.Path(os.path.dirname(__file__))
     scenarios_dir = base_dir / "scenarios"
+
     if scenarios_dir.exists() and scenarios_dir.is_dir():
-        for py_file in scenarios_dir.glob("*.py"):
-            if py_file.name == "__init__.py":
+        # Use glob to ensure compatibility with existing tests that mock Path.glob
+        for item in scenarios_dir.glob("*.py"):
+            # Ignore __init__.py and private files
+            if item.name == "__init__.py" or item.name.startswith("_"):
                 continue
 
-            short_name = py_file.stem
+            # Short name = module filename without extension
+            short_name = item.stem
+
+            # Fully-qualified module path
             full_module = f"scenarios.{short_name}"
 
-            # Don't override manually-specified names
-            if short_name not in scenarios:
-                # Check for DEVELOPER_SCENARIO flag
-                try:
-                    mod = importlib.import_module(full_module)
-                    if getattr(mod, "DEVELOPER_SCENARIO", False):
-                        continue
-                except ImportError:
-                    continue
-                    
-                scenarios[short_name] = full_module
+            scenarios[short_name] = full_module
 
     return scenarios
 
@@ -563,21 +550,19 @@ def run_scenario(module: Any, args: argparse.Namespace, scenario_name: str) -> N
 
     merged_params = final_params
 
+    # Ensure scenario-defined topology_type overrides schema defaults
+    if hasattr(module, 'DEFAULT_TOPOLOGY_TYPE'):
+        merged_params['topology_type'] = module.DEFAULT_TOPOLOGY_TYPE
+
     # PSS Logging Final
     if merged_params:
         print(f"[PSS] Final merged parameters: {merged_params}")
     elif full_schema and not cli_params and not preset_name:
          print(f"[PSS] Using schema defaults")
 
-    # Step 2: Build configuration with params
+    # Step 2: Build configuration with params (ALWAYS pass merged_params)
     print(f"Building configuration for '{scenario_name}'...")
-    
-    # Check if build_config accepts params
-    sig = inspect.signature(module.build_config)
-    if 'params' in sig.parameters:
-        cfg = module.build_config(merged_params if merged_params else None)
-    else:
-        cfg = module.build_config()
+    cfg = module.build_config(merged_params)
 
     # Config dump
     if args.config_dump:

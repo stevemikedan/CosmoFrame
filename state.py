@@ -8,6 +8,7 @@ All state structures use fixed-shape JAX arrays for JIT compilation.
 import jax
 import jax.numpy as jnp
 from chex import dataclass
+from dataclasses import field
 
 @dataclass
 class UniverseConfig:
@@ -26,7 +27,14 @@ class UniverseConfig:
     bounds: float | None = None  # None means infinite flat space
     # Physics stabilization
     gravity_softening: float = 0.05  # Softening length to prevent singularities
-    integrator: str = "euler"  # "euler" (semi-implicit) or "leapfrog" (velocity Verlet)
+    integrator: str = "euler"  # Default to stable integrator
+    
+    # Safety Controls (PS2.4)
+    max_accel: float = 1e5
+    max_vel: float = 1e4
+    max_step_growth: float = 1.05
+    radius_max: float = 1e12
+    
     enable_diagnostics: bool = True  # Compute energy/momentum diagnostics
     # Adaptive timestep parameters
     enable_adaptive_dt: bool = True  # Enable adaptive timestep
@@ -53,6 +61,7 @@ class UniverseConfig:
     # Topology distance parameters
     torus_size: float | None = None  # Periodic box size (default: radius*2)
     bubble_curvature: float = 0.0  # Radial curvature k for bubble metric (0 = flat)
+    enforce_sphere_constraint: bool = False  # Project positions to sphere radius (PS2.4)
     # Substrate parameters
     substrate: str = "none"  # "none", "vector"
     substrate_params: dict | None = None  # Parameters for the substrate
@@ -72,12 +81,27 @@ class UniverseState:
     entity_mass: jnp.ndarray    # shape (max_entities,)
     entity_radius: jnp.ndarray  # shape (max_entities,)
     entity_type: jnp.ndarray    # shape (max_entities,)
+    
+    # New PS2.4 Fields
+    entity_acc: jnp.ndarray = field(default=None)     # shape (max_entities, dim)
+    step_count: jnp.ndarray = field(default=None)     # scalar int
+    initial_energy: jnp.ndarray = field(default=None) # scalar float
 
     # Lattice arrays (always present, used in LATTICE mode)
-    node_active: jnp.ndarray    # shape (max_nodes,)
-    node_pos: jnp.ndarray       # shape (max_nodes, 2)
-    edge_active: jnp.ndarray    # shape (max_nodes, max_nodes)
-    edge_indices: jnp.ndarray   # shape (max_nodes, max_nodes, 2)
+    node_active: jnp.ndarray = field(default=None)    # shape (max_nodes,)
+    node_pos: jnp.ndarray = field(default=None)       # shape (max_nodes, 2)
+    edge_active: jnp.ndarray = field(default=None)    # shape (max_nodes, max_nodes)
+    edge_indices: jnp.ndarray = field(default=None)   # shape (max_nodes, max_nodes, 2)
+    
+    # Diagnostics (PS2.4) - initialized in initialize_state
+    kinetic_energy: jnp.ndarray = field(default=None)
+    potential_energy: jnp.ndarray = field(default=None)
+    total_energy: jnp.ndarray = field(default=None)
+    energy_drift: jnp.ndarray = field(default=None)
+    momentum: jnp.ndarray = field(default=None)
+    center_of_mass: jnp.ndarray = field(default=None)
+    dt_actual: jnp.ndarray = field(default=None)
+    wrap_count: jnp.ndarray = field(default=None)
 
     # Optional topology fields – placed at the end to keep .replace() compatibility
     topology_type: int = 0
@@ -92,7 +116,7 @@ def initialize_state(config: UniverseConfig) -> UniverseState:
     Returns:
         A fully initialized UniverseState with preallocated arrays
     """
-    return UniverseState(
+    state = UniverseState(
         # Global scalars
         time=jnp.array(0.0),
         expansion_factor=jnp.array(1.0),
@@ -105,7 +129,7 @@ def initialize_state(config: UniverseConfig) -> UniverseState:
         entity_mass=jnp.zeros(config.max_entities),
         entity_radius=jnp.full(config.max_entities, 0.1),  # Default radius
         entity_type=jnp.zeros(config.max_entities),
-
+        
         # Lattice arrays
         node_active=jnp.zeros(config.max_nodes, dtype=bool),
         node_pos=jnp.zeros((config.max_nodes, 2)),
@@ -115,4 +139,18 @@ def initialize_state(config: UniverseConfig) -> UniverseState:
         # Topology fields
         topology_type=config.topology_type,
         bounds=0.0 if config.bounds is None else config.bounds,
+    )
+
+    return state.replace(
+        entity_acc=jnp.zeros((config.max_entities, config.dim)),
+        step_count=jnp.array(0),
+        initial_energy=jnp.array(0.0),
+        kinetic_energy=jnp.array(0.0),
+        potential_energy=jnp.array(0.0),
+        total_energy=jnp.array(0.0),
+        energy_drift=jnp.array(0.0),
+        momentum=jnp.zeros((config.dim,)),
+        center_of_mass=jnp.zeros((config.dim,)),
+        dt_actual=jnp.array(config.dt),
+        wrap_count=jnp.zeros((config.max_entities,), dtype=int),
     )

@@ -11,6 +11,12 @@ import jax.numpy as jnp
 from dataclasses import dataclass
 from typing import Any, Callable, Protocol
 
+# Topology Constants
+TOPOLOGY_FLAT = 0
+TOPOLOGY_TORUS = 1
+TOPOLOGY_SPHERE = 2
+TOPOLOGY_BUBBLE = 3
+
 
 def compute_distance(p1: jnp.ndarray, p2: jnp.ndarray, topology_type: int, radius: float) -> jnp.ndarray:
     """Compute distance between two points based on topology type.
@@ -109,16 +115,64 @@ def apply_topology(pos: jnp.ndarray, vel: jnp.ndarray, config) -> tuple[jnp.ndar
         new_pos = wrap(pos)
         return new_pos, vel
 
+    def sphere(pos, vel, bounds):
+        # If no constraint requested, behave as identity
+        if not getattr(config, "enforce_sphere_constraint", False):
+            return pos, vel
+        
+        R = getattr(config, "radius", None)
+        if R is None or R <= 0:
+            return pos, vel
+        
+        # Project positions back to radius R
+        norms = jnp.linalg.norm(pos, axis=1, keepdims=True)
+        # Avoid divide-by-zero
+        norms = jnp.where(norms == 0, 1e-12, norms)
+        new_pos = pos * (R / norms)
+        
+        # Project velocities onto tangent plane
+        # v_tangent = v - (v·n) n
+        n = new_pos / R
+        v_dot_n = jnp.sum(vel * n, axis=1, keepdims=True)
+        new_vel = vel - v_dot_n * n
+        
+        return new_pos, new_vel
+
     def reserved(pos, vel, bounds):
         return pos, vel
 
     branches = [
-        lambda args: flat(args[0], args[1], args[2]),
-        lambda args: torus(args[0], args[1], args[2]),
-        lambda args: reserved(args[0], args[1], args[2]),
+        lambda args: flat(args[0], args[1], args[2]),      # 0 = flat
+        lambda args: torus(args[0], args[1], args[2]),     # 1 = torus
+        lambda args: sphere(args[0], args[1], args[2]),    # 2 = sphere
+        lambda args: reserved(args[0], args[1], args[2]),  # 3+ = reserved
     ]
 
-    # Ensure bounds is a float; if None, set to 0.0 (flat behavior)
-    bounds = 0.0 if config.bounds is None else config.bounds
+    # Unified torus bounds derivation
+    if config.topology_type == TOPOLOGY_TORUS:
+        # Prefer torus_size if defined
+        if hasattr(config, "torus_size") and config.torus_size is not None:
+            effective_width = config.torus_size
+        elif config.radius is not None:
+            # fallback for legacy configs
+            effective_width = 2.0 * config.radius
+        else:
+            raise ValueError("Torus topology requires torus_size or radius > 0.")
+        
+        # Prevent zero or negative domain
+        if effective_width <= 0:
+            raise ValueError(f"Invalid torus width {effective_width}. Must be > 0.")
+        
+        bounds = effective_width / 2.0
+    else:
+        # Non-torus fallback (retain existing behavior)
+        bounds = config.radius if config.bounds is None else config.bounds
+        if bounds is None:
+            bounds = 0.0
+    
+    # Early validation guard for torus
+    if config.topology_type == TOPOLOGY_TORUS and bounds <= 0:
+        raise ValueError("Torus topology requires bounds > 0 (derived from torus_size or radius).")
+    
     safe_type = jnp.clip(config.topology_type, 0, 2)
     return jax.lax.switch(safe_type, branches, (pos, vel, bounds))
