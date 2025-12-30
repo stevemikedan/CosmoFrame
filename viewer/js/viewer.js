@@ -6,11 +6,14 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { updateCameraView, resetCamera } from '../autoCamera.js';
+import { TrailManager } from './trails.js';
+
 
 export class ViewerManager {
     constructor(canvasElement) {
         this.canvas = canvasElement;
         this.player = null;
+        this.lastFrameIndex = -1;
         this.onFrameUpdate = null; // Callback for UI updates every frame
 
         // Auto-camera configuration
@@ -28,6 +31,7 @@ export class ViewerManager {
         this.initCamera();
         this.initLights();
         this.initControls();
+        this.initTrails();
         this.initEventListeners();
     }
 
@@ -71,6 +75,10 @@ export class ViewerManager {
         this.controls.dampingFactor = 0.05;
     }
 
+    initTrails() {
+        this.trailManager = new TrailManager(this.scene);
+    }
+
     initEventListeners() {
         window.addEventListener('resize', () => this.onWindowResize());
     }
@@ -97,10 +105,35 @@ export class ViewerManager {
                     updateCameraView(this.camera, frame.positions, this.config);
                 }
             }
+
+            // Update Trails (only if frame advanced)
+            const currentFrameIdx = this.player.currentFrame;
+            if (currentFrameIdx !== this.lastFrameIndex) {
+                // Relaxed continuity check: only clear if moving backwards or jumping significantly forward
+                const isForwardJump = currentFrameIdx > this.lastFrameIndex && currentFrameIdx <= this.lastFrameIndex + 10;
+
+                if (!isForwardJump && this.lastFrameIndex !== -1) {
+                    console.log(`[Viewer] Trail jump detected (${this.lastFrameIndex} -> ${currentFrameIdx}), clearing history`);
+                    this.trailManager.clear();
+                }
+
+                const frame = this.player.frames[currentFrameIdx];
+                if (frame && frame.positions) {
+                    this.trailManager.update(frame.positions);
+                }
+                this.lastFrameIndex = currentFrameIdx;
+            }
         }
 
         this.controls.update();
         this.renderer.render(this.scene, this.camera);
+    }
+
+    clearTrails() {
+        if (this.trailManager) {
+            this.trailManager.clear();
+            this.lastFrameIndex = -1;
+        }
     }
 
     onWindowResize() {

@@ -55,6 +55,12 @@ export class UIManager {
         this.hudTime = document.getElementById('hud-time');
         this.hudEntities = document.getElementById('hud-entities');
 
+        // Trail controls
+        this.toggleTrails = document.getElementById('toggleTrails');
+        this.trailSettings = document.getElementById('trailSettings');
+        this.trailLength = document.getElementById('trailLength');
+        this.trailFade = document.getElementById('trailFade');
+
         // Scenario panel
         this.btnOpenScenario = document.getElementById('btn-open-scenario');
         this.scenarioPanel = document.getElementById('scenarioPanel');
@@ -88,6 +94,11 @@ export class UIManager {
         this.toggleTopology?.addEventListener('change', (e) => this.handleTopologyToggle(e));
         this.toggleAutoCamera?.addEventListener('change', (e) => this.handleAutoCameraToggle(e));
         this.btnResetCamera?.addEventListener('click', () => this.handleResetCamera());
+
+        // Trail controls
+        this.toggleTrails?.addEventListener('change', (e) => this.handleTrailToggle(e));
+        this.trailLength?.addEventListener('input', (e) => this.handleTrailLengthChange(e));
+        this.trailFade?.addEventListener('input', (e) => this.handleTrailFadeChange(e));
 
         // Scenario panel
         this.btnOpenScenario?.addEventListener('click', () => this.openScenarioPanel());
@@ -228,6 +239,9 @@ export class UIManager {
         this.viewer.player = null;
         console.log('[UI] Cleared player reference');
 
+        // Clear trails
+        this.viewer.trailManager.clear();
+
         // Reset HUD
         this.hudFrame.textContent = '0';
         this.hudTotal.textContent = '0';
@@ -275,6 +289,7 @@ export class UIManager {
     handleRestart() {
         if (!this.viewer.player) return;
         this.viewer.player.restart();
+        this.viewer.clearTrails(); // Clear trail history on restart
         this.updatePlayButton();
         this.updateHUD();
     }
@@ -324,6 +339,25 @@ export class UIManager {
 
     handleResetCamera() {
         this.viewer.resetCameraToDefault();
+    }
+
+    handleTrailToggle(e) {
+        const enabled = e.target.checked;
+        this.viewer.trailManager.setEnabled(enabled);
+
+        if (enabled) {
+            this.trailSettings.classList.remove('hidden');
+        } else {
+            this.trailSettings.classList.add('hidden');
+        }
+    }
+
+    handleTrailLengthChange(e) {
+        this.viewer.trailManager.setLength(parseInt(e.target.value));
+    }
+
+    handleTrailFadeChange(e) {
+        this.viewer.trailManager.setFade(parseFloat(e.target.value));
     }
 
     // ============================================

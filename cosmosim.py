@@ -608,25 +608,29 @@ def run_scenario(module: Any, args: argparse.Namespace, scenario_name: str) -> N
     # -----------------------------------------------------------------
     # ROUTING: WEB VIEWER (Export)
     # -----------------------------------------------------------------
-    # ============================================================
-    # NEW: Standalone JSON export (single consolidated file)
-    # Triggered whenever --export-json is passed
-    # ============================================================
-    if args.export_json:
-        # Add timestamp to filename to prevent overwriting
+    if args.export_json or args.export_frames:
         steps_value = args.steps if args.steps is not None else getattr(cfg, "steps", 300)
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-        filename = f"{scenario_name}_{steps_value}_steps_{timestamp}.json"
         
-        outfile = (
-            pathlib.Path(args.output_dir) / filename
-            if args.output_dir else pathlib.Path("outputs") / filename
-        )
-        outfile.parent.mkdir(parents=True, exist_ok=True)
-
-        export_simulation_single(cfg, state, str(outfile), steps=steps_value)
-
-        print(f"[PSS] JSON export complete: {outfile}")
+        if args.export_json:
+            out_arg = args.output_dir or "outputs"
+            if out_arg.endswith(".json"):
+                outfile = pathlib.Path(out_arg)
+            else:
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+                filename = f"{scenario_name}_{steps_value}_steps_{timestamp}.json"
+                outfile = pathlib.Path(out_arg) / filename
+                
+            outfile.parent.mkdir(parents=True, exist_ok=True)
+            export_simulation_single(cfg, state, str(outfile), steps=steps_value)
+            print(f"[PSS] JSON consolidated export complete: {outfile}")
+            
+        if args.export_frames:
+            out_path = pathlib.Path(args.output_dir) if args.output_dir else pathlib.Path("outputs") / scenario_name
+            out_path.mkdir(parents=True, exist_ok=True)
+            print(f"[PSS] Exporting {steps_value} frames to: {out_path}")
+            export_simulation(cfg, state, steps=steps_value, output_dir=out_path)
+            print(f"[PSS] Frame export complete: {out_path}")
+            
         return
 
     if view_mode == "web":

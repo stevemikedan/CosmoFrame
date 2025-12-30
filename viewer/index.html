@@ -52,6 +52,19 @@
             <input type="checkbox" id="toggleAutoCamera" checked>
             Auto Camera
         </label>
+        <span class="separator">|</span>
+        <div id="trailControls">
+            <label>
+                <input type="checkbox" id="toggleTrails">
+                Trails
+            </label>
+            <div id="trailSettings" class="hidden">
+                <label>Len:</label>
+                <input type="range" id="trailLength" min="2" max="1000" value="300" title="Trail Length">
+                <label>Fade:</label>
+                <input type="range" id="trailFade" min="0" max="1" step="0.1" value="0.5" title="Trail Fade">
+            </div>
+        </div>
         <button id="btn-reset-camera" title="Reset Camera (C)">📷 Reset</button>
     </div>
 

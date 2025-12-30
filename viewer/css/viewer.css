@@ -225,3 +225,45 @@ button:disabled {
 #controls label[for="toggleAutoCamera"] {
     cursor: pointer;
 }
+
+/* ============================================
+   Trail Controls
+   ============================================ */
+
+#trailControls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#trailSettings {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: opacity 0.2s;
+}
+
+#trailSettings.hidden {
+    display: none;
+    opacity: 0;
+}
+
+input[type="range"] {
+    width: 60px;
+    height: 6px;
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--color-disabled);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    background: var(--color-primary);
+    border-radius: 50%;
+    cursor: pointer;
+}
