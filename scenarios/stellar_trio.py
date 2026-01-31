@@ -104,7 +104,6 @@ def build_initial_state(cfg: UniverseConfig, params: dict | None = None) -> Univ
     for i in range(3):
         state = spawn_entity(state, pos[i], vel[i], masses[i], 1)
     
-    state.scenario_name = "stellar_trio"
     return state
 
 

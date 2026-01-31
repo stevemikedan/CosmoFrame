@@ -59,7 +59,6 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
     state = spawn_entity(state, pos1, vel1, mass, 1)
     state = spawn_entity(state, pos2, vel2, mass, 1)
     
-    state.scenario_name = "2body_orbit"
     return state
 
 def run(config, state, steps=300):

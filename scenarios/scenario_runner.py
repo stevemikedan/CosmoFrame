@@ -63,17 +63,16 @@ def mini_solar_system():
     return cfg, state
 
 
-def build_config() -> UniverseConfig:
+def build_config(params: dict | None = None) -> UniverseConfig:
     cfg, _ = binary_star_system()
     return cfg
 
 
-def build_initial_state(config: UniverseConfig):
-    # Note: We ignore the passed config here because binary_star_system 
+def build_initial_state(config: UniverseConfig, params: dict | None = None):
+    # Note: We ignore the passed config here because binary_star_system
     # creates its own config/state pair. In a more advanced version,
     # we might use the passed config to override parameters.
     _, state = binary_star_system()
-    state.scenario_name = "scenario_runner"
     return state
 
 

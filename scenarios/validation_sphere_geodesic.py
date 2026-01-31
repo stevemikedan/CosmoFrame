@@ -81,7 +81,6 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
         vel = jnp.array([0.05, 0.05, 0.05])
         state = spawn_entity(state, pos, vel, 1.0, 1)
     
-    state.scenario_name = "sphere_geodesic"
     return state
 
 def run(config, state, steps=300):

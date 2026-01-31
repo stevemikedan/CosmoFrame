@@ -63,7 +63,6 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
         1
     )
         
-    state.scenario_name = "mobius_walk"
     return state
 
 

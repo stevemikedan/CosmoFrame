@@ -7,7 +7,7 @@ from kernel import step_simulation
 
 DEVELOPER_SCENARIO = True
 
-def build_config() -> UniverseConfig:
+def build_config(params: dict | None = None) -> UniverseConfig:
     return UniverseConfig(
         topology_type=0,
         physics_mode=0,
@@ -21,7 +21,7 @@ def build_config() -> UniverseConfig:
     )
 
 
-def build_initial_state(config: UniverseConfig):
+def build_initial_state(config: UniverseConfig, params: dict | None = None):
     state = initialize_state(config)
     # simple 3-body line
     # Ensure dim-safe initialization
@@ -39,7 +39,6 @@ def build_initial_state(config: UniverseConfig):
     state = spawn_entity(state, pos_a, vel, 2.0, 1)
     state = spawn_entity(state, pos_b, vel, 1.0, 1)
     state = spawn_entity(state, pos_c, vel, 2.0, 1)
-    state.scenario_name = "manual_run"
     return state
 
 

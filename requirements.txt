@@ -1,0 +1,11 @@
+# Core Physics & Computation
+jax>=0.4.0
+jaxlib>=0.4.0
+chex>=0.1.0
+numpy>=1.19.0
+
+# Visualization
+matplotlib>=3.3.0
+
+# Testing
+pytest>=6.0.0

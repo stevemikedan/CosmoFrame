@@ -67,21 +67,23 @@ SCENARIO_PRESETS = {
 }
 
 
-def build_config() -> UniverseConfig:
+def build_config(params: dict | None = None) -> UniverseConfig:
     """
     Create configuration for a ring of orbiting bodies.
     """
+    if params is None:
+        params = {}
     return UniverseConfig(
-        physics_mode=0,      # Newtonian gravity
-        radius=20.0,
-        max_entities=128,
+        physics_mode=params.get('physics_mode', 0),
+        radius=params.get('radius', 20.0),
+        max_entities=params.get('max_entities', 128),
         max_nodes=1,
-        dt=0.05,
-        c=1.0,
-        G=1.0,
-        dim=2,
-        topology_type=0,     # flat
-        bounds=20.0,
+        dt=params.get('dt', 0.05),
+        c=params.get('c', 1.0),
+        G=params.get('G', 1.0),
+        dim=params.get('dim', 2),
+        topology_type=params.get('topology_type', 0),
+        bounds=params.get('bounds', 20.0),
     )
 
 
@@ -140,7 +142,6 @@ def build_initial_state(cfg: UniverseConfig, params: dict | None = None) -> Univ
         entity_active=active,
     )
     
-    state.scenario_name = "bulk_ring"
     return state
 
 

@@ -56,7 +56,6 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
     state = spawn_entity(state, pos1, vel1, 1.0, 1)
     state = spawn_entity(state, pos2, vel2, 1.0, 1)
     
-    state.scenario_name = "torus_wrap"
     return state
 
 def run(config, state, steps=300):

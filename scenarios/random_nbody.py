@@ -94,7 +94,6 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
             masses[i],
             1,
         )
-    state.scenario_name = "random_nbody"
     return state
 
 

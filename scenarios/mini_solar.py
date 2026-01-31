@@ -86,7 +86,6 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
             
         state = spawn_entity(state, pos, vel, mass, 1)
     
-    state.scenario_name = "mini_solar"
     return state
 
 def run(config, state, steps=300):

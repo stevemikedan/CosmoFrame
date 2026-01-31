@@ -156,7 +156,6 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
     for i in range(n):
         state = spawn_entity(state, pos[i], vel[i], masses[i], 1)
         
-    state.scenario_name = "random_nbody_3d"
     return state
 
 def run(config, state, steps=300):

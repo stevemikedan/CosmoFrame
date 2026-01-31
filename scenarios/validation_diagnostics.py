@@ -60,7 +60,6 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
     for i in range(N):
         state = spawn_entity(state, pos[i], vel[i], mass[i], 1)
     
-    state.scenario_name = "diagnostics_demo"
     return state
 
 def run(config, state, steps=300):

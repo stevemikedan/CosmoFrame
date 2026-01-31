@@ -560,9 +560,13 @@ def run_scenario(module: Any, args: argparse.Namespace, scenario_name: str) -> N
     elif full_schema and not cli_params and not preset_name:
          print(f"[PSS] Using schema defaults")
 
-    # Step 2: Build configuration with params (ALWAYS pass merged_params)
+    # Step 2: Build configuration with params
     print(f"Building configuration for '{scenario_name}'...")
-    cfg = module.build_config(merged_params)
+    sig = inspect.signature(module.build_config)
+    if 'params' in sig.parameters:
+        cfg = module.build_config(merged_params)
+    else:
+        cfg = module.build_config()
 
     # Config dump
     if args.config_dump:

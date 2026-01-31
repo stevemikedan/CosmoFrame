@@ -108,7 +108,6 @@ def build_initial_state(config: UniverseConfig, params: dict | None = None) -> U
     for i in range(n):
         state = spawn_entity(state, positions[i], velocities[i], masses[i], 1)
         
-    state.scenario_name = "bubble_collapse"
     return state
 
 def run(config, state, steps=300):
